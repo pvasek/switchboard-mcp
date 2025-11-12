@@ -10,6 +10,45 @@
             "request": "launch",
             "program": "${workspaceFolder}/src/main.py",
             "console": "integratedTerminal"
+        },
+        {
+            "name": "MCP Server (STDIO)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "switchboard_mcp.server",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "MCP Server (HTTP)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "switchboard_mcp.server",
+            "args": ["http"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "MCP Test Client (STDIO)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/test_client.py",
+            "args": ["--transport", "stdio"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "MCP Test Client (HTTP)",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/test_client.py",
+            "args": ["--transport", "http"],
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "justMyCode": false
         }
     ]
 }

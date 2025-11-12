@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from simple_script.interpreter import Interpreter
@@ -82,22 +84,8 @@ def browse_tools(root: Folder, path: str = "") -> str:
     return "\n".join(result_parts) if result_parts else "No entries found."
 
 
-def execute_script(tools: list[Tool], script: str) -> str:
-    """
-    This is super simple python executor.
-    It supports only:
-    - imports with from ... import ... ...
-    - function calls with positional arguments only
-    - simple print statement
-
-    Example:
-    ```python
-        from math.operations import plus, minus
-        result = plus(2, 3)
-        print(result)
-    ```
-    """
-
+def _execute_script_sync(tools: list[Tool], script: str) -> str:
+    """Synchronous script execution - runs in a separate thread."""
     print("execute_script -------------------------- START")
     print(script)
     prints = []
@@ -113,4 +101,27 @@ def execute_script(tools: list[Tool], script: str) -> str:
     result = "\n".join(prints)
     print(result)
     print("")
+    return result
+
+
+async def execute_script(tools: list[Tool], script: str) -> str:
+    """
+    This is super simple python executor.
+    It supports only:
+    - imports with from ... import ... ...
+    - function calls with positional arguments only
+    - simple print statement
+
+    Example:
+    ```python
+        from math.operations import plus, minus
+        result = plus(2, 3)
+        print(result)
+    ```
+    """
+    # Run the script in a separate thread so that tools can use
+    # asyncio.run_coroutine_threadsafe to call back to this event loop
+    loop = asyncio.get_running_loop()
+    with ThreadPoolExecutor() as executor:
+        result = await loop.run_in_executor(executor, _execute_script_sync, tools, script)
     return result

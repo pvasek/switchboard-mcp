@@ -25,9 +25,29 @@ async def browse_tools(path: str = "") -> str:
 async def execute_script(script: str) -> str:
     async with SessionManager(config) as manager:
         tools = await manager.get_all_tools()
-        root = Folder.from_tools(tools)
-        return utils.execute_script(root.tools, script)
+        return await utils.execute_script(tools, script)
 
 
 if __name__ == "__main__":
-    mcp.run(transport="stdio")  # or HTTP etc.
+    import sys
+
+    # Parse command-line arguments for transport selection
+    transport = "stdio"  # Default to stdio for compatibility
+
+    if len(sys.argv) > 1:
+        transport = sys.argv[1].lower()
+        # Map "http" to "streamable-http" (FastMCP's actual transport name)
+        if transport == "http":
+            transport = "streamable-http"
+        if transport not in ["stdio", "streamable-http"]:
+            print(f"Invalid transport: {transport}. Valid options: stdio, http")
+            print("Using stdio instead.")
+            transport = "stdio"
+
+    if transport == "stdio":
+        mcp.run(transport="stdio")
+    else:
+        # For streamable-http, host/port are configured in FastMCP constructor
+        # Default is 127.0.0.1:8000
+        print("Starting MCP server on HTTP at http://127.0.0.1:8000")
+        mcp.run(transport=transport)
