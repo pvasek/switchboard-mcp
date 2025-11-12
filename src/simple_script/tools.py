@@ -44,24 +44,26 @@ class Tool:
         )
 
     @classmethod
-    def from_mcp_tool(cls, mcp_tool: Any) -> Tool:
+    def from_mcp_tool(cls, mcp_tool: Any, func: Callable[..., Any]) -> Tool:
         """Create a Tool from an MCP tool object."""
         # Extract parameters from inputSchema
         parameters = []
-        if hasattr(mcp_tool, 'inputSchema') and mcp_tool.inputSchema:
+        if hasattr(mcp_tool, "inputSchema") and mcp_tool.inputSchema:
             properties = mcp_tool.inputSchema.get("properties", {})
             for param_name, param_schema in properties.items():
                 param_type = param_schema.get("type", None)
                 # Handle array types
                 if param_type == "array":
                     items = param_schema.get("items", {})
-                    items_type = items.get("type", "any") if isinstance(items, dict) else "any"
+                    items_type = (
+                        items.get("type", "any") if isinstance(items, dict) else "any"
+                    )
                     param_type = f"list[{items_type}]"
                 parameters.append(ToolParameter(name=param_name, type=param_type))
 
         return cls(
             name=mcp_tool.name,
-            func=None,  # MCP tools don't have direct function references
+            func=func,
             description=mcp_tool.description or "No description available",
             parameters=parameters if parameters else None,
         )
