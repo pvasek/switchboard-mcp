@@ -1948,14 +1948,14 @@ name = "switchboard-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "mcp" },
+    { name = "fastmcp" },
     { name = "pydantic-ai" },
     { name = "pytest" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "mcp", specifier = ">=1.21.0" },
+    { name = "fastmcp", specifier = ">=2.13.0.2" },
     { name = "pydantic-ai", specifier = ">=1.12.0" },
     { name = "pytest", specifier = ">=8.3.4" },
 ]

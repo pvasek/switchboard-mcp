@@ -1,4 +1,4 @@
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP
 
 from simple_script.tools import Folder
 from switchboard_mcp import utils
@@ -11,7 +11,7 @@ mcp = FastMCP("Switchboard MCP Server")
 config = MCPServerConfig.from_yaml("switchboard.yaml")
 
 
-@mcp.tool()
+@mcp.tool
 @utils.copy_doc(utils.browse_tools)
 async def browse_tools(path: str = "") -> str:
     async with SessionManager(config) as manager:
@@ -20,7 +20,7 @@ async def browse_tools(path: str = "") -> str:
         return utils.browse_tools(root, path)
 
 
-@mcp.tool()
+@mcp.tool
 @utils.copy_doc(utils.execute_script)
 async def execute_script(script: str) -> str:
     async with SessionManager(config) as manager:
@@ -36,10 +36,7 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 1:
         transport = sys.argv[1].lower()
-        # Map "http" to "streamable-http" (FastMCP's actual transport name)
-        if transport == "http":
-            transport = "streamable-http"
-        if transport not in ["stdio", "streamable-http"]:
+        if transport not in ["stdio", "http"]:
             print(f"Invalid transport: {transport}. Valid options: stdio, http")
             print("Using stdio instead.")
             transport = "stdio"
