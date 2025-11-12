@@ -30,6 +30,17 @@ A simple lexer, parser, and interpreter for a Python-like subset language.
 - **Numbers**: Integer literals (e.g., `42`, `100`)
 - **Strings**: Double-quoted strings (e.g., `"hello"`)
 - **Lists**: List literals with square brackets (e.g., `[1, 2, 3]`, `[10, 20, 30]`)
+  - Empty lists: `[]`
+  - Lists with expressions: `[1 + 2, 3 * 4]`
+  - Nested lists: `[[1, 2], [3, 4]]`
+  - Mixed-type lists: `[1, "hello", x]`
+- **Dictionaries**: Dictionary literals with curly braces (e.g., `{"key": "value"}`)
+  - Empty dicts: `{}`
+  - String keys: `{"name": "Alice", "age": 30}`
+  - Variable keys: `{x: 1, y: 2}`
+  - Expression keys: `{1 + 1: "two"}`
+  - Nested dicts: `{"outer": {"inner": "value"}}`
+  - Mixed values: `{"num": 42, "list": [1, 2, 3]}`
 - **Variables**: Named identifiers (e.g., `x`, `count`, `my_var`)
 
 ### Operators
@@ -66,11 +77,170 @@ A simple lexer, parser, and interpreter for a Python-like subset language.
   print(result)
   ```
 
+### Lists
+
+Lists are ordered collections that can hold any type of value.
+
+- **Empty lists**: Create an empty list
+  ```python
+  empty = []
+  ```
+
+- **List literals**: Create lists with initial values
+  ```python
+  numbers = [1, 2, 3, 4, 5]
+  names = ["Alice", "Bob", "Charlie"]
+  mixed = [1, "hello", 42]
+  ```
+
+- **Lists with expressions**: List elements can be any expression
+  ```python
+  x = 10
+  y = 20
+  calculations = [x + y, x * 2, y / 2]  # [30, 20, 10.0]
+  ```
+
+- **Nested lists**: Lists can contain other lists
+  ```python
+  matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+  pairs = [[1, 2], [3, 4], [5, 6]]
+  ```
+
+- **Lists as function arguments**: Pass lists to imported functions
+  ```python
+  from math.statistics import min, max, average
+
+  numbers = [5, 2, 8, 1, 9, 3]
+  smallest = min(numbers)        # 1
+  largest = max(numbers)          # 9
+  avg = average(numbers)          # 4.666...
+  ```
+
+- **Multiple list arguments**: Functions can accept multiple lists
+  ```python
+  from list.operations import concat
+
+  list1 = [1, 2, 3]
+  list2 = [4, 5, 6]
+  combined = concat(list1, list2)  # [1, 2, 3, 4, 5, 6]
+  ```
+
+- **Mixed arguments**: Combine scalars and lists
+  ```python
+  from list.operations import prepend, append
+
+  items = [2, 3, 4]
+  with_first = prepend(1, items)   # [1, 2, 3, 4]
+  with_last = append(items, 5)     # [2, 3, 4, 5]
+  ```
+
+### Dictionaries
+
+Dictionaries are key-value mappings that allow efficient data organization.
+
+- **Empty dictionaries**: Create an empty dictionary
+  ```python
+  empty = {}
+  ```
+
+- **Dictionary literals**: Create dictionaries with initial key-value pairs
+  ```python
+  person = {"name": "Alice", "age": 30, "city": "NYC"}
+  config = {"host": "localhost", "port": 8080, "debug": 1}
+  ```
+
+- **Variable keys**: Keys can be variables or expressions
+  ```python
+  key1 = "username"
+  key2 = "password"
+  credentials = {key1: "admin", key2: "secret"}
+  ```
+
+- **Expression keys**: Keys can be any expression
+  ```python
+  # Numeric expression keys
+  lookup = {1 + 1: "two", 2 + 2: "four", 3 + 3: "six"}
+
+  # String expression keys
+  prefix = "user_"
+  data = {prefix: "value"}  # {"user_": "value"}
+  ```
+
+- **Various value types**: Values can be any type
+  ```python
+  mixed = {
+      "number": 42,
+      "text": "hello",
+      "list": [1, 2, 3],
+      "nested": {"inner": "value"}
+  }
+  ```
+
+- **Nested dictionaries**: Dictionaries can contain other dictionaries
+  ```python
+  config = {
+      "database": {
+          "host": "localhost",
+          "port": 5432
+      },
+      "cache": {
+          "enabled": 1,
+          "ttl": 300
+      }
+  }
+  ```
+
+- **Dictionaries as function arguments**: Pass dictionaries to imported functions
+  ```python
+  from json import stringify, parse
+  from data.utils import getkeys, merge
+
+  # Stringify a dictionary
+  person = {"name": "Bob", "age": 35}
+  json_str = stringify(person)
+
+  # Get all keys
+  keys = getkeys(person)  # ["name", "age"]
+
+  # Merge dictionaries
+  defaults = {"theme": "dark", "lang": "en"}
+  user_prefs = {"theme": "light"}
+  settings = merge(defaults, user_prefs)  # {"theme": "light", "lang": "en"}
+  ```
+
+- **Multiple dictionary arguments**: Functions can accept multiple dictionaries
+  ```python
+  from data.utils import merge, compare
+
+  dict1 = {"a": 1, "b": 2}
+  dict2 = {"c": 3, "d": 4}
+  combined = merge(dict1, dict2)  # {"a": 1, "b": 2, "c": 3, "d": 4}
+  ```
+
+- **Mixed arguments**: Combine scalars, lists, and dictionaries
+  ```python
+  from data.operations import update, transform
+
+  base = {"status": "active"}
+  enriched = update("timestamp", 12345, base)
+  # {"status": "active", "timestamp": 12345}
+  ```
+
+- **Key constraints**: Dictionary keys must be hashable
+  ```python
+  # Valid keys: numbers, strings
+  valid = {1: "one", "key": "value", 42: "answer"}
+
+  # Invalid: lists as keys (will raise RuntimeError)
+  # invalid = {[1, 2]: "value"}  # Error!
+  ```
+
 ## Example Program
 
 ```python
 # Import functions from other modules
 from math.utils import factorial
+from math.statistics import min, max, average
 from io.display import print_result
 
 # Calculate factorial
@@ -94,9 +264,48 @@ def factorial_local(n):
         result = result * counter
     return result
 
-# Example with list literal and builtin
+# List examples with builtin and imported functions
 numbers = [1, 2, 3, 4, 5]
 print("Numbers created")  # Builtin function, automatically available
+
+# Using lists with imported functions
+scores = [85, 92, 78, 95, 88]
+lowest = min(scores)
+highest = max(scores)
+avg_score = average(scores)
+
+print("Score analysis complete")
+
+# Nested list example
+matrix = [[1, 2], [3, 4], [5, 6]]
+
+# List with expressions and variables
+a = 10
+b = 20
+calculated = [a + b, a * 2, b / 2]
+
+# Dictionary examples
+person = {"name": "David", "age": 28, "role": "developer"}
+print("Person record created")
+
+# Nested dictionary
+settings = {
+    "app": {
+        "name": "MyApp",
+        "version": "1.0"
+    },
+    "features": {
+        "darkMode": 1,
+        "notifications": 1
+    }
+}
+
+# Dictionary with mixed types
+data = {
+    "id": 12345,
+    "tags": ["python", "scripting"],
+    "meta": {"created": "2025-01-01"}
+}
 ```
 
 ## Architecture

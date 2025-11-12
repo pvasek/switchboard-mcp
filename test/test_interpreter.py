@@ -245,3 +245,273 @@ result"""
 
     result = interpreter.evaluate(script)
     assert result == "custom: test"
+
+
+class TestInterpreterListSupport:
+    """Test interpreter evaluation of lists"""
+
+    def test_interpreter_evaluates_empty_list(self):
+        """Test evaluating an empty list"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("[]")
+        assert result == []
+
+    def test_interpreter_evaluates_list_with_numbers(self):
+        """Test evaluating a list with numbers"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("[1, 2, 3]")
+        assert result == [1, 2, 3]
+
+    def test_interpreter_evaluates_list_with_strings(self):
+        """Test evaluating a list with strings"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('["hello", "world"]')
+        assert result == ["hello", "world"]
+
+    def test_interpreter_evaluates_list_with_expressions(self):
+        """Test evaluating a list with expressions"""
+        interpreter = Interpreter([])
+        script = "[1 + 2, 3 * 4, 10 - 5]"
+        result = interpreter.evaluate(script)
+        assert result == [3, 12, 5]
+
+    def test_interpreter_evaluates_list_with_variables(self):
+        """Test evaluating a list with variables"""
+        interpreter = Interpreter([])
+        script = """x = 10
+y = 20
+z = 30
+[x, y, z]"""
+        result = interpreter.evaluate(script)
+        assert result == [10, 20, 30]
+
+    def test_interpreter_evaluates_nested_lists(self):
+        """Test evaluating nested lists"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("[[1, 2], [3, 4], [5, 6]]")
+        assert result == [[1, 2], [3, 4], [5, 6]]
+
+    def test_interpreter_list_assignment(self):
+        """Test assigning a list to a variable"""
+        interpreter = Interpreter([])
+        script = """numbers = [1, 2, 3, 4, 5]
+numbers"""
+        result = interpreter.evaluate(script)
+        assert result == [1, 2, 3, 4, 5]
+
+    def test_interpreter_list_as_function_argument(self):
+        """Test passing a list as a function argument"""
+        def sum_func(numbers: list[float]) -> float:
+            """Sum all numbers."""
+            return sum(numbers)
+
+        sum_tool = Tool.from_function(sum_func)
+        sum_tool.name = "math_operations_sum"
+
+        interpreter = Interpreter([sum_tool])
+        script = """from math.operations import sum
+result = sum([1, 2, 3, 4, 5])
+result"""
+        result = interpreter.evaluate(script)
+        assert result == 15
+
+    def test_interpreter_multiple_list_arguments(self):
+        """Test passing multiple lists as function arguments"""
+        def concat_func(list1: list, list2: list) -> list:
+            """Concatenate two lists."""
+            return list1 + list2
+
+        concat_tool = Tool.from_function(concat_func)
+        concat_tool.name = "list_operations_concat"
+
+        interpreter = Interpreter([concat_tool])
+        script = """from list.operations import concat
+result = concat([1, 2], [3, 4])
+result"""
+        result = interpreter.evaluate(script)
+        assert result == [1, 2, 3, 4]
+
+    def test_interpreter_mixed_arguments(self):
+        """Test passing both scalar and list arguments"""
+        def prepend_func(item: int, items: list[int]) -> list[int]:
+            """Prepend item to list."""
+            return [item] + items
+
+        prepend_tool = Tool.from_function(prepend_func)
+        prepend_tool.name = "list_operations_prepend"
+
+        interpreter = Interpreter([prepend_tool])
+        script = """from list.operations import prepend
+result = prepend(0, [1, 2, 3])
+result"""
+        result = interpreter.evaluate(script)
+        assert result == [0, 1, 2, 3]
+
+    def test_interpreter_list_from_variable_in_function_call(self):
+        """Test passing a list variable to a function"""
+        def length_func(items: list) -> int:
+            """Get length of list."""
+            return len(items)
+
+        length_tool = Tool.from_function(length_func)
+        length_tool.name = "list_operations_length"
+
+        interpreter = Interpreter([length_tool])
+        script = """from list.operations import length
+numbers = [10, 20, 30, 40]
+result = length(numbers)
+result"""
+        result = interpreter.evaluate(script)
+        assert result == 4
+
+    def test_interpreter_list_with_mixed_types(self):
+        """Test evaluating a list with mixed types"""
+        interpreter = Interpreter([])
+        script = """x = 42
+[1, "hello", x]"""
+        result = interpreter.evaluate(script)
+        assert result == [1, "hello", 42]
+
+
+class TestInterpreterDictSupport:
+    """Test interpreter evaluation of dictionaries"""
+
+    def test_interpreter_evaluates_empty_dict(self):
+        """Test evaluating an empty dict"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("{}")
+        assert result == {}
+
+    def test_interpreter_evaluates_dict_with_string_keys(self):
+        """Test evaluating dict with string keys"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('{"name": "John", "age": 30}')
+        assert result == {"name": "John", "age": 30}
+
+    def test_interpreter_evaluates_dict_with_variable_keys(self):
+        """Test evaluating dict with variable keys"""
+        interpreter = Interpreter([])
+        script = """x = "name"
+y = "age"
+{x: "John", y: 30}"""
+        result = interpreter.evaluate(script)
+        assert result == {"name": "John", "age": 30}
+
+    def test_interpreter_evaluates_dict_with_expression_values(self):
+        """Test evaluating dict with expression values"""
+        interpreter = Interpreter([])
+        script = '{"sum": 1 + 2, "product": 3 * 4}'
+        result = interpreter.evaluate(script)
+        assert result == {"sum": 3, "product": 12}
+
+    def test_interpreter_evaluates_nested_dicts(self):
+        """Test evaluating nested dicts"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('{"outer": {"inner": "value"}}')
+        assert result == {"outer": {"inner": "value"}}
+
+    def test_interpreter_dict_assignment(self):
+        """Test assigning a dict to a variable"""
+        interpreter = Interpreter([])
+        script = """person = {"name": "Alice", "age": 25}
+person"""
+        result = interpreter.evaluate(script)
+        assert result == {"name": "Alice", "age": 25}
+
+    def test_interpreter_dict_as_function_argument(self):
+        """Test passing a dict as a function argument"""
+        def getname(person: dict) -> str:
+            """Get name from person dict."""
+            return person["name"]
+
+        getname_tool = Tool.from_function(getname)
+        getname_tool.name = "data_operations_getname"
+
+        interpreter = Interpreter([getname_tool])
+        script = """from data.operations import getname
+result = getname({"name": "Bob", "age": 35})
+result"""
+        result = interpreter.evaluate(script)
+        assert result == "Bob"
+
+    def test_interpreter_multiple_dict_arguments(self):
+        """Test passing multiple dicts as function arguments"""
+        def merge_dicts(dict1: dict, dict2: dict) -> dict:
+            """Merge two dicts."""
+            result = dict1.copy()
+            result.update(dict2)
+            return result
+
+        merge_tool = Tool.from_function(merge_dicts)
+        merge_tool.name = "data_utils_merge"
+
+        interpreter = Interpreter([merge_tool])
+        script = """from data.utils import merge
+result = merge({"a": 1}, {"b": 2})
+result"""
+        result = interpreter.evaluate(script)
+        assert result == {"a": 1, "b": 2}
+
+    def test_interpreter_mixed_arguments(self):
+        """Test passing both scalar and dict arguments"""
+        def addfield(key: str, value: int, data: dict) -> dict:
+            """Add field to dict."""
+            result = data.copy()
+            result[key] = value
+            return result
+
+        addfield_tool = Tool.from_function(addfield)
+        addfield_tool.name = "data_utils_addfield"
+
+        interpreter = Interpreter([addfield_tool])
+        script = """from data.utils import addfield
+result = addfield("age", 30, {"name": "Charlie"})
+result"""
+        result = interpreter.evaluate(script)
+        assert result == {"name": "Charlie", "age": 30}
+
+    def test_interpreter_dict_from_variable_in_function_call(self):
+        """Test passing a dict variable to a function"""
+        def getkeys(data: dict) -> list:
+            """Get keys from dict."""
+            return list(data.keys())
+
+        getkeys_tool = Tool.from_function(getkeys)
+        getkeys_tool.name = "data_utils_getkeys"
+
+        interpreter = Interpreter([getkeys_tool])
+        script = """from data.utils import getkeys
+config = {"host": "localhost", "port": 8080}
+result = getkeys(config)
+result"""
+        result = interpreter.evaluate(script)
+        assert set(result) == {"host", "port"}
+
+    def test_interpreter_dict_with_list_value(self):
+        """Test evaluating dict with list as value"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('{"items": [1, 2, 3], "count": 3}')
+        assert result == {"items": [1, 2, 3], "count": 3}
+
+    def test_interpreter_dict_with_expression_keys(self):
+        """Test evaluating dict with expression keys"""
+        interpreter = Interpreter([])
+        script = """{1 + 1: "two", 2 + 2: "four"}"""
+        result = interpreter.evaluate(script)
+        assert result == {2: "two", 4: "four"}
+
+    def test_interpreter_dict_with_number_keys(self):
+        """Test evaluating dict with number keys"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('{1: "one", 2: "two", 3: "three"}')
+        assert result == {1: "one", 2: "two", 3: "three"}
+
+    def test_interpreter_dict_list_as_key_error(self):
+        """Test that using a list as a dict key raises an error"""
+        interpreter = Interpreter([])
+        script = """{[1, 2]: "value"}"""
+        try:
+            interpreter.evaluate(script)
+            assert False, "Should have raised RuntimeError"
+        except RuntimeError as e:
+            assert "key" in str(e).lower() or "hashable" in str(e).lower()

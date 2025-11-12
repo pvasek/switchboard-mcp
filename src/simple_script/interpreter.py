@@ -1,11 +1,12 @@
 from typing import Any
 
-from simple_script.lexer import Lexer
-from simple_script.parser import (
+from src.simple_script.lexer import Lexer
+from src.simple_script.parser import (
     Assignment,
     ASTNode,
     BinaryOp,
     Call,
+    DictLiteral,
     ExpressionStatement,
     FunctionDef,
     IfStatement,
@@ -18,7 +19,7 @@ from simple_script.parser import (
     Variable,
     WhileStatement,
 )
-from simple_script.tools import Tool
+from src.simple_script.tools import Tool
 
 
 class Interpreter:
@@ -151,6 +152,16 @@ class Interpreter:
             return self._evaluate_call(node)
         elif isinstance(node, ListLiteral):
             return [self._evaluate_expression(elem) for elem in node.elements]
+        elif isinstance(node, DictLiteral):
+            result = {}
+            for key_node, value_node in node.pairs:
+                key = self._evaluate_expression(key_node)
+                value = self._evaluate_expression(value_node)
+                # Validate key is hashable
+                if isinstance(key, list):
+                    raise RuntimeError("Dictionary keys cannot be lists (must be hashable)")
+                result[key] = value
+            return result
         else:
             raise RuntimeError(f"Unknown expression type: {type(node)}")
 

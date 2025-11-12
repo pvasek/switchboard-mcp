@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from simple_script.lexer import TokenType
+from src.simple_script.lexer import TokenType
 
 
 @dataclass
@@ -40,6 +40,11 @@ class Call(ASTNode):
 @dataclass
 class ListLiteral(ASTNode):
     elements: list[ASTNode]
+
+
+@dataclass
+class DictLiteral(ASTNode):
+    pairs: list[tuple[ASTNode, ASTNode]]
 
 
 # Statements
@@ -361,5 +366,31 @@ class Parser:
 
             self.expect(TokenType.RBRACKET)
             return ListLiteral(elements)
+
+        # Dictionary literal
+        if self.current_token().type == TokenType.LBRACE:
+            self.advance()
+            pairs = []
+
+            if self.current_token().type != TokenType.RBRACE:
+                # Parse first key-value pair
+                key = self.parse_expression()
+                self.expect(TokenType.COLON)
+                value = self.parse_expression()
+                pairs.append((key, value))
+
+                # Parse remaining pairs
+                while self.current_token().type == TokenType.COMMA:
+                    self.advance()
+                    # Allow trailing comma
+                    if self.current_token().type == TokenType.RBRACE:
+                        break
+                    key = self.parse_expression()
+                    self.expect(TokenType.COLON)
+                    value = self.parse_expression()
+                    pairs.append((key, value))
+
+            self.expect(TokenType.RBRACE)
+            return DictLiteral(pairs)
 
         raise SyntaxError(f"Unexpected token: {self.current_token()}")
