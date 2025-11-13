@@ -16,7 +16,7 @@ from .parser import (
     Return,
     ExpressionStatement,
 )
-from .tools import Tool, ToolParameter, Folder
+from .tools import Tool, ToolParameter
 from .interpreter import Interpreter
 
 __all__ = [
@@ -43,7 +43,6 @@ __all__ = [
     # Tools exports
     "Tool",
     "ToolParameter",
-    "Folder",
     # Interpreter exports
     "Interpreter",
 ]

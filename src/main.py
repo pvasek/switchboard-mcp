@@ -14,7 +14,8 @@ from pydantic_ai.settings import ModelSettings
 
 import src.switchboard_mcp.utils as utils
 from simple_script.interpreter import Interpreter
-from simple_script.tools import Folder, Tool
+from simple_script.tools import Tool
+from switchboard_mcp.utils import Folder
 
 load_dotenv()
 

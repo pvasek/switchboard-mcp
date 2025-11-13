@@ -1,7 +1,7 @@
 from fastmcp import FastMCP
 
-from simple_script.tools import Folder
 from switchboard_mcp import utils
+from switchboard_mcp.utils import Folder
 from switchboard_mcp.config import MCPServerConfig
 from switchboard_mcp.session_manager import SessionManager
 
