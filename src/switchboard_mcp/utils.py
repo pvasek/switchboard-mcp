@@ -102,14 +102,16 @@ def copy_doc(from_func):
 
 def _format_function_description(tool: Tool) -> str:
     """
-    Format a tool as a function signature with description.
+    Format a tool as a Python function definition with type hints.
 
     Args:
         tool: The Tool object to format
 
     Returns:
-        Formatted string: "function_name(param1: type1, param2: type2): description"
+        Formatted multi-line Python function definition string
     """
+    import inspect
+
     # Extract function name from the tool name
     # For builtins, strip the "builtins_" prefix
     if tool.name.startswith("builtins_"):
@@ -130,7 +132,30 @@ def _format_function_description(tool: Tool) -> str:
     else:
         param_signature = "()"
 
-    return f"{function_name}{param_signature}: {tool.description}"
+    # Determine return type
+    return_type = "Any"
+    if tool.func:
+        try:
+            # Try to get return annotation from the function
+            sig = inspect.signature(tool.func)
+            if sig.return_annotation != inspect.Signature.empty:
+                # Get the string representation of the return type
+                return_annotation = sig.return_annotation
+                if hasattr(return_annotation, '__name__'):
+                    return_type = return_annotation.__name__
+                else:
+                    return_type = str(return_annotation).replace('typing.', '')
+        except Exception:
+            # If we can't inspect, default to Any
+            return_type = "Any"
+
+    # Format as Python function definition
+    lines = []
+    lines.append(f"def {function_name}{param_signature} -> {return_type}:")
+    lines.append(f'    """{tool.description}"""')
+    lines.append("    ...")
+
+    return "\n".join(lines)
 
 
 def _format_type_from_schema(schema: dict[str, Any], type_name: str) -> str:
@@ -318,7 +343,10 @@ def browse_tools(root: Folder, path: str = "") -> str:
             result_parts.append("")  # Empty line separator
         result_parts.append("Functions:")
         for tool in current_folder.tools:
-            result_parts.append(f"  {_format_function_description(tool)}")
+            # Indent each line of the function definition
+            func_def = _format_function_description(tool)
+            indented = "\n".join(f"  {line}" for line in func_def.split("\n"))
+            result_parts.append(indented)
 
     return "\n".join(result_parts) if result_parts else "No entries found."
 

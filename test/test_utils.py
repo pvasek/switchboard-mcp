@@ -27,7 +27,8 @@ class TestFormatFunctionDescription:
             ],
         )
         result = _format_function_description(tool)
-        assert result == "plus(x: number, y: number): Add two numbers together"
+        expected = 'def plus(x: number, y: number) -> Any:\n    """Add two numbers together"""\n    ...'
+        assert result == expected
 
     def test_builtin_tool(self):
         """Test builtin tool (with builtins_ prefix)."""
@@ -38,7 +39,8 @@ class TestFormatFunctionDescription:
             parameters=[ToolParameter(name="text", type="string")],
         )
         result = _format_function_description(tool)
-        assert result == "print(text: string): Print text to output"
+        expected = 'def print(text: string) -> Any:\n    """Print text to output"""\n    ...'
+        assert result == expected
 
     def test_builtin_with_underscores(self):
         """Test builtin tool with underscores in name."""
@@ -53,7 +55,8 @@ class TestFormatFunctionDescription:
         )
         result = _format_function_description(tool)
         # Should strip "builtins_" and show the rest
-        assert result == "liquid_template_as_str(template: string, data: string): Render a liquid template"
+        expected = 'def liquid_template_as_str(template: string, data: string) -> Any:\n    """Render a liquid template"""\n    ...'
+        assert result == expected
 
     def test_tool_without_types(self):
         """Test tool with parameters but no type annotations."""
@@ -67,7 +70,8 @@ class TestFormatFunctionDescription:
             ],
         )
         result = _format_function_description(tool)
-        assert result == "func(arg1, arg2): Helper function"
+        expected = 'def func(arg1, arg2) -> Any:\n    """Helper function"""\n    ...'
+        assert result == expected
 
     def test_tool_no_parameters(self):
         """Test tool with no parameters."""
@@ -78,7 +82,41 @@ class TestFormatFunctionDescription:
             parameters=None,
         )
         result = _format_function_description(tool)
-        assert result == "version(): Get current version"
+        expected = 'def version() -> Any:\n    """Get current version"""\n    ...'
+        assert result == expected
+
+    def test_tool_with_return_type_annotation(self):
+        """Test tool with function that has return type annotation."""
+        def sample_func(x: int, y: int) -> int:
+            return x + y
+
+        tool = Tool(
+            name="math_operations_add",
+            func=sample_func,
+            description="Add two integers",
+            parameters=[
+                ToolParameter(name="x", type="int"),
+                ToolParameter(name="y", type="int"),
+            ],
+        )
+        result = _format_function_description(tool)
+        expected = 'def add(x: int, y: int) -> int:\n    """Add two integers"""\n    ...'
+        assert result == expected
+
+    def test_tool_with_none_return_type(self):
+        """Test tool with function that returns None."""
+        def sample_func(text: str) -> None:
+            print(text)
+
+        tool = Tool(
+            name="builtins_print",
+            func=sample_func,
+            description="Print text",
+            parameters=[ToolParameter(name="text", type="str")],
+        )
+        result = _format_function_description(tool)
+        expected = 'def print(text: str) -> None:\n    """Print text"""\n    ...'
+        assert result == expected
 
 
 class TestJsonTypeToPython:
@@ -678,7 +716,8 @@ class TestBrowseToolsWithTypes:
 
         # Should show Functions section
         assert "Functions:" in result
-        assert "create(name: string, email: string): Create a new user" in result
+        assert "def create(name: string, email: string) -> Any:" in result
+        assert '"""Create a new user"""' in result
 
     def test_tool_with_nested_object_shows_type(self):
         """Test that tools with nested objects in inputSchema show type definitions."""
@@ -721,7 +760,8 @@ class TestBrowseToolsWithTypes:
 
         # Should also show Functions section
         assert "Functions:" in result
-        assert "create(user: object): Create a new user" in result
+        assert "def create(user: object) -> Any:" in result
+        assert '"""Create a new user"""' in result
 
     def test_tool_without_object_schema_no_type(self):
         """Test that tools without object inputSchema don't show type definitions."""
@@ -745,7 +785,8 @@ class TestBrowseToolsWithTypes:
 
         # Should show Functions section
         assert "Functions:" in result
-        assert "get(user_id: string): Get user by ID" in result
+        assert "def get(user_id: string) -> Any:" in result
+        assert '"""Get user by ID"""' in result
 
     def test_tool_with_array_of_objects_shows_type(self):
         """Test that tools with array of objects show type definitions."""
@@ -788,7 +829,8 @@ class TestBrowseToolsWithTypes:
 
         # Should show function
         assert "Functions:" in result
-        assert "create(records: list): Create multiple records" in result
+        assert "def create(records: list) -> Any:" in result
+        assert '"""Create multiple records"""' in result
 
     def test_mixed_tools_with_and_without_nested_types(self):
         """Test browsing folder with mix of tools with/without nested types."""
@@ -846,5 +888,7 @@ class TestBrowseToolsWithTypes:
 
         # Should show both functions
         assert "Functions:" in result
-        assert "create(record: object): Create record" in result
-        assert "delete(id: integer): Delete record" in result
+        assert "def create(record: object) -> Any:" in result
+        assert '"""Create record"""' in result
+        assert "def delete(id: integer) -> Any:" in result
+        assert '"""Delete record"""' in result
