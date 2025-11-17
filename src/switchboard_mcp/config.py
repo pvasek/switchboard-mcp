@@ -25,10 +25,25 @@ class SSEConfig:
 
 
 @dataclass
+class NamespaceMapping:
+    """Defines how to map tool name patterns to namespaces.
+
+    Supports glob-like patterns:
+    - name* : matches tools starting with 'name'
+    - *name : matches tools ending with 'name'
+    - *name* : matches tools containing 'name'
+    """
+    tools: list[str]
+    namespace: str
+
+
+@dataclass
 class MCPServerConfig:
     name: str
     stdio: Optional[StdioConfig] = None
     sse: Optional[SSEConfig] = None
+    namespace_mappings: Optional[list[NamespaceMapping]] = None
+    remove_prefix: Optional[str] = None
 
     def __post_init__(self):
         if not self.stdio and not self.sse:
@@ -54,8 +69,25 @@ class MCPServerConfig:
             if "sse" in server_data:
                 sse = SSEConfig(**server_data["sse"])
 
+            # Parse namespace mappings if present
+            namespace_mappings = None
+            if "namespace_mappings" in server_data:
+                namespace_mappings = [
+                    NamespaceMapping(**mapping)
+                    for mapping in server_data["namespace_mappings"]
+                ]
+
+            # Parse remove_prefix if present
+            remove_prefix = server_data.get("remove_prefix")
+
             # Create server config
-            config = MCPServerConfig(name=server_data["name"], stdio=stdio, sse=sse)
+            config = MCPServerConfig(
+                name=server_data["name"],
+                stdio=stdio,
+                sse=sse,
+                namespace_mappings=namespace_mappings,
+                remove_prefix=remove_prefix,
+            )
             servers.append(config)
 
         return servers

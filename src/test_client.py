@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -63,7 +62,7 @@ class MCPTestClient:
         try:
             if self.HISTORY_FILE.exists():
                 self.last_script = self.HISTORY_FILE.read_text(encoding="utf-8")
-        except Exception as e:
+        except Exception:
             # Silently ignore errors - history is optional
             pass
 
@@ -71,7 +70,7 @@ class MCPTestClient:
         """Save the last executed script to disk."""
         try:
             self.HISTORY_FILE.write_text(self.last_script, encoding="utf-8")
-        except Exception as e:
+        except Exception:
             # Silently ignore errors - history is optional
             pass
 
@@ -132,15 +131,15 @@ class MCPTestClient:
             print("No tools available.")
             return
 
-        for i, tool in enumerate(tools_result.tools, 1):
-            print(f"{i}. {tool.name}")
+        for tool in tools_result.tools:
+            print(f"tool: {tool.name}")
             if tool.description:
-                print(f"   {tool.description}")
+                print(f"description: {tool.description}")
             if tool.inputSchema:
                 # Show parameters
                 properties = tool.inputSchema.get("properties", {})
                 if properties:
-                    print("   Parameters:")
+                    print("parameters:")
                     for param_name, param_info in properties.items():
                         param_type = param_info.get("type", "any")
                         param_desc = param_info.get("description", "")
@@ -168,7 +167,9 @@ class MCPTestClient:
         print("=" * 80)
         print("\nCommands:")
         print("  browse [path]       - Browse tools at given path (empty for root)")
-        print("  execute             - Execute a multi-line script (finish with two Enter)")
+        print(
+            "  execute             - Execute a multi-line script (finish with two Enter)"
+        )
         print("  last                - Re-execute the last script")
         print("  list                - List all available tools")
         print("  help                - Show this help message")
@@ -202,7 +203,9 @@ class MCPTestClient:
                 elif command == "help":
                     print("\nCommands:")
                     print("  browse [path]       - Browse tools at given path")
-                    print("  execute             - Execute a multi-line script (finish with two Enter)")
+                    print(
+                        "  execute             - Execute a multi-line script (finish with two Enter)"
+                    )
                     print("  last                - Re-execute the last script")
                     print("  list                - List all available tools")
                     print("  help                - Show this help message")
@@ -217,7 +220,9 @@ class MCPTestClient:
                         continue
 
                     print(f"\nRe-executing last script:\n{self.last_script}\n")
-                    result = await self.call_tool("execute_script", {"script": self.last_script})
+                    result = await self.call_tool(
+                        "execute_script", {"script": self.last_script}
+                    )
                     if result:
                         print("\nResult:")
                         for content in result.content:
@@ -339,6 +344,12 @@ async def main():
         default=8000,
         help="Server port for HTTP transport (default: 8000)",
     )
+    parser.add_argument(
+        "--delay",
+        type=float,
+        default=0,
+        help="Delay in seconds before connecting to server (default: 0)",
+    )
 
     args = parser.parse_args()
 
@@ -349,6 +360,10 @@ async def main():
     )
 
     try:
+        if args.delay > 0:
+            print(f"Waiting {args.delay} seconds before connecting...")
+            await asyncio.sleep(args.delay)
+
         await client.connect()
         await client.interactive_loop()
     except Exception as e:

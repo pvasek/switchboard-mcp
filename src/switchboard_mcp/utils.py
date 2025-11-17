@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from simple_script.interpreter import Interpreter
 from simple_script.tools import Tool
+
+if TYPE_CHECKING:
+    from switchboard_mcp.session_manager import ToolGroup
 
 
 @dataclass
@@ -17,79 +19,138 @@ class Folder:
     tools: list[Tool]
 
     @classmethod
-    def from_tools(cls, tools: list[Tool]) -> "Folder":
-        """Build a hierarchical folder structure with 3+ grouping rule.
+    def from_tools(cls, tool_groups: list[ToolGroup]) -> Folder:
+        """Build a hierarchical folder structure from tool groups with namespace mappings.
 
-        Only creates subfolders when 3 or more tools share the same prefix.
-        Tools with < 3 items in their group are flattened to the parent level.
+        For each tool:
+        - Tools starting with 'builtins_' are added directly to root
+        - Tools matching a namespace mapping pattern are placed under: server_name.namespace.remaining
+          Patterns support: name* (prefix), *name (suffix), *name* (contains)
+        - Tools not matching any mapping are placed under: server_name.tool_name
         """
         root = cls(name="", folders=[], tools=[])
 
-        # Separate builtin tools from regular tools
-        builtins = []
-        regular_tools = []
-        for tool in tools:
-            if tool.name.startswith("builtins_"):
-                builtins.append(tool)
-            else:
-                regular_tools.append(tool)
+        for tool_group in tool_groups:
+            server_name = tool_group.server_config.name
+            remove_prefix = tool_group.server_config.remove_prefix
 
-        # Add builtins directly to root
-        root.tools.extend(builtins)
+            for tool in tool_group.tools:
+                # Handle builtins - always add directly to root
+                if tool.name.startswith("builtins_"):
+                    root.tools.append(tool)
+                    continue
 
-        # Group regular tools by first part (always create top-level folders)
-        top_groups = defaultdict(list)
-        for tool in regular_tools:
-            parts = tool.name.split("_")
-            if len(parts) == 1:
-                # Single-part name, add as tool
-                root.tools.append(tool)
-            else:
-                first_part = parts[0]
-                top_groups[first_part].append(tool)
+                # Apply prefix removal if configured
+                tool_to_add = tool
+                if remove_prefix and tool.name.startswith(remove_prefix):
+                    # Create a new tool with the prefix removed from the name
+                    new_name = tool.name[len(remove_prefix):]
+                    tool_to_add = Tool(
+                        name=new_name,
+                        func=tool.func,
+                        description=tool.description,
+                        parameters=tool.parameters,
+                        inputSchema=tool.inputSchema,
+                    )
 
-        # Create top-level folders and recursively process with grouping rules
-        for folder_name, folder_tools in top_groups.items():
-            subfolder = cls(name=folder_name, folders=[], tools=[])
-            root.folders.append(subfolder)
-            _add_tools_with_grouping(subfolder, folder_tools, 1)
+                # Try to apply namespace mappings
+                mapped = False
+                if tool_group.server_config.namespace_mappings:
+                    for mapping in tool_group.server_config.namespace_mappings:
+                        # Try each pattern in the mapping
+                        # Use original tool name for pattern matching
+                        for pattern in mapping.tools:
+                            if _match_pattern(tool.name, pattern):
+                                # Split namespace by dots to create folder hierarchy
+                                namespace_parts = mapping.namespace.split(".")
+                                # Prepend server name to namespace path
+                                full_path = [server_name] + namespace_parts
+
+                                # Navigate/create folder hierarchy and add tool (with prefix removed if configured)
+                                _add_tool_to_path(root, full_path, tool_to_add)
+                                mapped = True
+                                break
+
+                        if mapped:
+                            break
+
+                # If no mapping matched, add directly to server folder
+                if not mapped:
+                    full_path = [server_name]
+                    _add_tool_to_path(root, full_path, tool_to_add)
 
         return root
 
 
-def _add_tools_with_grouping(folder: Folder, tools: list[Tool], depth: int) -> None:
-    """Recursively add tools to folder, applying 3+ grouping rule.
+def _match_pattern(tool_name: str, pattern: str) -> bool:
+    """Match a tool name against a glob-like pattern.
+
+    Supports three pattern types:
+    - name*  : matches tools starting with 'name'
+    - *name  : matches tools ending with 'name'
+    - *name* : matches tools containing 'name'
 
     Args:
-        folder: The folder to add tools to
-        tools: List of tools to process
-        depth: Current depth in the tool name hierarchy (0-indexed)
+        tool_name: The tool name to match
+        pattern: The glob pattern
+
+    Returns:
+        True if the pattern matches, False otherwise
     """
-    if not tools:
+    if "*" not in pattern:
+        # Exact match (no wildcard)
+        return tool_name == pattern
+
+    # Count wildcards
+    wildcard_count = pattern.count("*")
+    if wildcard_count > 2:
+        return False
+
+    # Handle different pattern types
+    if pattern.startswith("*") and pattern.endswith("*"):
+        # *name* - contains pattern
+        if wildcard_count != 2:
+            return False
+        search_str = pattern[1:-1]  # Remove both asterisks
+        return search_str in tool_name
+
+    elif pattern.startswith("*"):
+        # *name - suffix pattern (tool ends with name)
+        suffix = pattern[1:]  # Remove asterisk
+        return tool_name.endswith(suffix)
+
+    elif pattern.endswith("*"):
+        # name* - prefix pattern (tool starts with name)
+        prefix = pattern[:-1]  # Remove asterisk
+        return tool_name.startswith(prefix)
+
+    return False
+
+
+def _add_tool_to_path(root: Folder, path: list[str], tool: Tool) -> None:
+    """Navigate/create folder hierarchy and add tool at the end.
+
+    Args:
+        root: The root folder to start from
+        path: List of folder names (e.g., ['server_name', 'namespace'])
+        tool: The tool to add (keeps its original full name)
+    """
+    if not path:
+        root.tools.append(tool)
         return
 
-    # Group tools by the next part in their name
-    groups = defaultdict(list)
+    # Navigate/create all folders in the path
+    current_folder = root
+    for part in path:
+        # Find or create subfolder
+        subfolder = next((f for f in current_folder.folders if f.name == part), None)
+        if not subfolder:
+            subfolder = Folder(name=part, folders=[], tools=[])
+            current_folder.folders.append(subfolder)
+        current_folder = subfolder
 
-    for tool in tools:
-        parts = tool.name.split("_")
-        if depth >= len(parts) - 1:
-            # This is a leaf tool at this level (no more parts)
-            folder.tools.append(tool)
-        else:
-            next_part = parts[depth]
-            groups[next_part].append(tool)
-
-    # Process each group with the 3+ rule
-    for group_name, group_tools in groups.items():
-        if len(group_tools) >= 3:
-            # Create subfolder for this group (3+ tools)
-            subfolder = Folder(name=group_name, folders=[], tools=[])
-            folder.folders.append(subfolder)
-            _add_tools_with_grouping(subfolder, group_tools, depth + 1)
-        else:
-            # Flatten: skip this level, add tools directly to current folder
-            folder.tools.extend(group_tools)
+    # Add the tool to the final folder (tool keeps its original name)
+    current_folder.tools.append(tool)
 
 
 def copy_doc(from_func):
@@ -141,10 +202,10 @@ def _format_function_description(tool: Tool) -> str:
             if sig.return_annotation != inspect.Signature.empty:
                 # Get the string representation of the return type
                 return_annotation = sig.return_annotation
-                if hasattr(return_annotation, '__name__'):
+                if hasattr(return_annotation, "__name__"):
                     return_type = return_annotation.__name__
                 else:
-                    return_type = str(return_annotation).replace('typing.', '')
+                    return_type = str(return_annotation).replace("typing.", "")
         except Exception:
             # If we can't inspect, default to Any
             return_type = "Any"
@@ -247,7 +308,9 @@ def _json_type_to_python(schema: dict[str, Any]) -> str:
     if "enum" in schema:
         enum_values = schema["enum"]
         # Format string values with quotes
-        formatted_values = [f'"{v}"' if isinstance(v, str) else str(v) for v in enum_values]
+        formatted_values = [
+            f'"{v}"' if isinstance(v, str) else str(v) for v in enum_values
+        ]
         return f"Literal[{', '.join(formatted_values)}]"
 
     # Handle basic types
@@ -313,9 +376,11 @@ def browse_tools(root: Folder, path: str = "") -> str:
 
     # 1. Show subnamespaces with counts
     if subnamespaces:
-        result_parts.append("Subnamespaces:")
+        result_parts.append("Namespaces:")
         for ns_path, num_sub, num_func in subnamespaces:
-            result_parts.append(f"  {ns_path} (subnamespaces: {num_sub}, functions: {num_func})")
+            result_parts.append(
+                f"  {ns_path} (subnamespaces: {num_sub}, functions: {num_func})"
+            )
 
     # 2. Show types (only nested types from inputSchema, not root types)
     types_to_show = []
@@ -373,22 +438,20 @@ def _execute_script_sync(tools: list[Tool], script: str) -> str:
 
 async def execute_script(tools: list[Tool], script: str) -> str:
     """
-    This is super simple python executor.
-    It supports only:
-    - imports with from ... import ... ...
-    - function calls with positional arguments only
-    - simple print statement
+    Python-like interpreter. Supports: imports, variables, literals (str/int/list/dict),
+    operators (+,-,*,/,==,<,>), if/else, while, def/return, print().
 
     Example:
     ```python
-        from math.operations import plus, minus
-        result = plus(2, 3)
-        print(result)
+        from math.operations import plus
+        print(plus(2, 3))
     ```
     """
     # Run the script in a separate thread so that tools can use
     # asyncio.run_coroutine_threadsafe to call back to this event loop
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as executor:
-        result = await loop.run_in_executor(executor, _execute_script_sync, tools, script)
+        result = await loop.run_in_executor(
+            executor, _execute_script_sync, tools, script
+        )
     return result

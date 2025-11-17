@@ -11,6 +11,13 @@ from switchboard_mcp.config import MCPServerConfig
 T = TypeVar("T")
 
 
+@dataclass
+class ToolGroup:
+    """Group of tools from a single MCP server with its configuration."""
+    server_config: MCPServerConfig
+    tools: List[Tool]
+
+
 def run_async_in_loop(
     co_routine: Coroutine[Any, Any, T],
     loop: asyncio.AbstractEventLoop,
@@ -53,6 +60,7 @@ class SessionHolder:
     session: ClientSession
     session_cm: Any  # ClientSession context manager
     stdio_cm: Any  # stdio_client context manager
+    server_config: MCPServerConfig  # Configuration for this server
 
 
 class SessionManager:
@@ -85,7 +93,9 @@ class SessionManager:
                 await session.initialize()
 
                 # Store all components for cleanup
-                self.sessions.append(SessionHolder(session, session_cm, stdio_cm))
+                self.sessions.append(
+                    SessionHolder(session, session_cm, stdio_cm, server_cfg)
+                )
 
             elif server_cfg.sse:
                 raise NotImplementedError("SSE transport not implemented yet")
@@ -111,23 +121,31 @@ class SessionManager:
         self.sessions.clear()
         return False  # Don't suppress exceptions
 
-    async def get_all_tools(self) -> List[Tool]:
-        """Get all tools from all active sessions"""
+    async def get_all_tools(self) -> List[ToolGroup]:
+        """Get all tools from all active sessions, grouped by server"""
         if self.loop is None:
             raise RuntimeError(
                 "SessionManager must be entered as context manager first"
             )
 
-        all_tools = []
+        tool_groups = []
 
         for session_holder in self.sessions:
             tools_list = await session_holder.session.list_tools()
+            server_tools = []
             for mcp_tool in tools_list.tools:
-                all_tools.append(
+                server_tools.append(
                     Tool.from_mcp_tool(
                         mcp_tool,
                         create_mcp_adapter(session_holder.session, mcp_tool, self.loop),
                     )
                 )
 
-        return all_tools
+            tool_groups.append(
+                ToolGroup(
+                    server_config=session_holder.server_config,
+                    tools=server_tools,
+                )
+            )
+
+        return tool_groups

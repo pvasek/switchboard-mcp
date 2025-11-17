@@ -3,6 +3,8 @@
 import pytest
 
 from simple_script.tools import Tool, ToolParameter
+from switchboard_mcp.config import MCPServerConfig, NamespaceMapping, StdioConfig
+from switchboard_mcp.session_manager import ToolGroup
 from switchboard_mcp.utils import (
     Folder,
     _format_function_description,
@@ -10,6 +12,16 @@ from switchboard_mcp.utils import (
     _json_type_to_python,
     browse_tools,
 )
+
+
+def create_tool_group(tools: list[Tool], namespace_mappings: list[NamespaceMapping] | None = None) -> ToolGroup:
+    """Helper function to create a ToolGroup for testing."""
+    config = MCPServerConfig(
+        name="test_server",
+        stdio=StdioConfig(command="test", args=[]),
+        namespace_mappings=namespace_mappings,
+    )
+    return ToolGroup(server_config=config, tools=tools)
 
 
 class TestFormatFunctionDescription:
@@ -420,265 +432,40 @@ class TestBrowseToolsWithCounts:
             ),
         ]
 
-        root = Folder.from_tools(tools)
+        # Without namespace mappings, all tools go under server name
+        root = Folder.from_tools([create_tool_group(tools)])
 
-        # Check root level - should show "api" with counts
-        result = browse_tools(root, "")
-        assert "Subnamespaces:" in result
-        assert "api (subnamespaces: 2, functions: 0)" in result
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
 
-        # Check api level - should show users and products with their counts
-        result = browse_tools(root, "api")
-        assert "Subnamespaces:" in result
-        assert "api.users (subnamespaces: 0, functions: 3)" in result
-        assert "api.products (subnamespaces: 0, functions: 3)" in result
+        # All tools should be directly under test_server
+        assert len(test_server_folder.tools) == 6
 
     def test_nested_subnamespaces_show_counts(self):
-        """Test deeply nested subnamespaces show correct counts."""
+        """Test deeply nested subnamespaces show correct counts with namespace mapping."""
         tools = [
-            Tool(
-                name="browser_console_messages_get",
-                func=None,
-                description="Get messages",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_console_errors_get",
-                func=None,
-                description="Get errors",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_console_warnings_get",
-                func=None,
-                description="Get warnings",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_fill_form",
-                func=None,
-                description="Fill form",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_fill_input",
-                func=None,
-                description="Fill input",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_fill_select",
-                func=None,
-                description="Fill select",
-                parameters=None,
-            ),
+            Tool(name="browser_console_messages_get", func=None, description="Get messages", parameters=None),
+            Tool(name="browser_console_errors_get", func=None, description="Get errors", parameters=None),
+            Tool(name="browser_console_warnings_get", func=None, description="Get warnings", parameters=None),
+            Tool(name="browser_fill_form", func=None, description="Fill form", parameters=None),
+            Tool(name="browser_fill_input", func=None, description="Fill input", parameters=None),
+            Tool(name="browser_fill_select", func=None, description="Fill select", parameters=None),
         ]
 
-        root = Folder.from_tools(tools)
-
-        # Check browser level
-        result = browse_tools(root, "browser")
-        assert "Subnamespaces:" in result
-        assert "browser.console (subnamespaces: 0, functions: 3)" in result
-        assert "browser.fill (subnamespaces: 0, functions: 3)" in result
-
-
-class TestFolderGroupingWithThreePlusRule:
-    """Test suite for Folder.from_tools() with 3+ grouping rule."""
-
-    def test_folder_creation_with_3_plus_items(self):
-        """Test that subfolder is created when 3+ tools share the same prefix."""
-        tools = [
-            Tool(
-                name="browser_test_a",
-                func=None,
-                description="Test A",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_test_b",
-                func=None,
-                description="Test B",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_test_c",
-                func=None,
-                description="Test C",
-                parameters=None,
-            ),
+        namespace_mappings = [
+            NamespaceMapping(tools=["browser_console_*"], namespace="browser.console"),
+            NamespaceMapping(tools=["browser_fill_*"], namespace="browser.fill"),
         ]
 
-        root = Folder.from_tools(tools)
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
 
-        # Should have browser folder
-        assert len(root.folders) == 1
-        browser_folder = root.folders[0]
-        assert browser_folder.name == "browser"
-
-        # Browser should have test subfolder (3+ tools)
-        assert len(browser_folder.folders) == 1
-        test_folder = browser_folder.folders[0]
-        assert test_folder.name == "test"
-
-        # Test folder should have 3 tools
-        assert len(test_folder.tools) == 3
-        tool_names = [t.name for t in test_folder.tools]
-        assert "browser_test_a" in tool_names
-        assert "browser_test_b" in tool_names
-        assert "browser_test_c" in tool_names
-
-    def test_folder_flattening_with_less_than_3_items(self):
-        """Test that no subfolder is created when < 3 tools share prefix (flattened)."""
-        tools = [
-            Tool(
-                name="browser_test_a",
-                func=None,
-                description="Test A",
-                parameters=None,
-            ),
-            Tool(
-                name="browser_test_b",
-                func=None,
-                description="Test B",
-                parameters=None,
-            ),
-        ]
-
-        root = Folder.from_tools(tools)
-
-        # Should have browser folder
-        assert len(root.folders) == 1
-        browser_folder = root.folders[0]
-        assert browser_folder.name == "browser"
-
-        # Browser should have NO test subfolder (< 3 tools)
-        assert len(browser_folder.folders) == 0
-
-        # Tools should be flattened directly into browser folder
-        assert len(browser_folder.tools) == 2
-        tool_names = [t.name for t in browser_folder.tools]
-        assert "browser_test_a" in tool_names
-        assert "browser_test_b" in tool_names
-
-    def test_mixed_grouping_some_3_plus_some_less(self):
-        """Test mixed scenario with some groups >= 3 and some < 3."""
-        tools = [
-            # test group: 3 tools (should create subfolder)
-            Tool(name="browser_test_a", func=None, description="", parameters=None),
-            Tool(name="browser_test_b", func=None, description="", parameters=None),
-            Tool(name="browser_test_c", func=None, description="", parameters=None),
-            # console group: 2 tools (should be flattened)
-            Tool(name="browser_console_log", func=None, description="", parameters=None),
-            Tool(name="browser_console_error", func=None, description="", parameters=None),
-            # Single tool (should be flattened)
-            Tool(name="browser_navigate", func=None, description="", parameters=None),
-        ]
-
-        root = Folder.from_tools(tools)
-
-        # Should have browser folder
-        assert len(root.folders) == 1
-        browser_folder = root.folders[0]
-
-        # Browser should have only test subfolder (3+ items)
-        assert len(browser_folder.folders) == 1
-        test_folder = browser_folder.folders[0]
-        assert test_folder.name == "test"
-        assert len(test_folder.tools) == 3
-
-        # Console and navigate should be flattened into browser
-        assert len(browser_folder.tools) == 3
-        tool_names = [t.name for t in browser_folder.tools]
-        assert "browser_console_log" in tool_names
-        assert "browser_console_error" in tool_names
-        assert "browser_navigate" in tool_names
-
-    def test_deep_nesting_with_grouping_rules(self):
-        """Test multi-level nesting with grouping rules applied at each level."""
-        tools = [
-            # api.users group: 3 tools (should create subfolder)
-            Tool(name="api_users_create", func=None, description="", parameters=None),
-            Tool(name="api_users_delete", func=None, description="", parameters=None),
-            Tool(name="api_users_update", func=None, description="", parameters=None),
-            # api.auth group: 2 tools (should be flattened)
-            Tool(name="api_auth_login", func=None, description="", parameters=None),
-            Tool(name="api_auth_logout", func=None, description="", parameters=None),
-        ]
-
-        root = Folder.from_tools(tools)
-
-        # Should have api folder
-        assert len(root.folders) == 1
-        api_folder = root.folders[0]
-        assert api_folder.name == "api"
-
-        # API should have users subfolder (3+ items)
-        assert len(api_folder.folders) == 1
-        users_folder = api_folder.folders[0]
-        assert users_folder.name == "users"
-        assert len(users_folder.tools) == 3
-
-        # Auth should be flattened into api
-        assert len(api_folder.tools) == 2
-        tool_names = [t.name for t in api_folder.tools]
-        assert "api_auth_login" in tool_names
-        assert "api_auth_logout" in tool_names
-
-    def test_builtins_unaffected_by_grouping_rule(self):
-        """Test that builtin tools are still added to root, unaffected by grouping."""
-        tools = [
-            Tool(name="builtins_print", func=None, description="", parameters=None),
-            Tool(name="builtins_log", func=None, description="", parameters=None),
-            Tool(name="browser_navigate", func=None, description="", parameters=None),
-        ]
-
-        root = Folder.from_tools(tools)
-
-        # Root should have 2 builtin tools
-        assert len(root.tools) == 2
-        builtin_names = [t.name for t in root.tools]
-        assert "builtins_print" in builtin_names
-        assert "builtins_log" in builtin_names
-
-        # Should still have browser folder
-        assert len(root.folders) == 1
-        assert root.folders[0].name == "browser"
-
-    def test_exactly_3_items_creates_folder(self):
-        """Test boundary condition: exactly 3 items should create folder."""
-        tools = [
-            Tool(name="math_calc_add", func=None, description="", parameters=None),
-            Tool(name="math_calc_sub", func=None, description="", parameters=None),
-            Tool(name="math_calc_mul", func=None, description="", parameters=None),
-        ]
-
-        root = Folder.from_tools(tools)
-
-        # Should have math folder with calc subfolder
-        math_folder = root.folders[0]
-        assert len(math_folder.folders) == 1
-        calc_folder = math_folder.folders[0]
-        assert calc_folder.name == "calc"
-        assert len(calc_folder.tools) == 3
-
-    def test_single_tool_flattened(self):
-        """Test that single tool with multiple underscores is flattened."""
-        tools = [
-            Tool(name="browser_console_log", func=None, description="", parameters=None),
-        ]
-
-        root = Folder.from_tools(tools)
-
-        # Should have browser folder
-        browser_folder = root.folders[0]
-
-        # No console subfolder (only 1 tool)
-        assert len(browser_folder.folders) == 0
-
-        # Tool flattened into browser
-        assert len(browser_folder.tools) == 1
-        assert browser_folder.tools[0].name == "browser_console_log"
+        # Check test_server.browser level
+        result = browse_tools(root, "test_server.browser")
+        assert "Namespaces:" in result
+        assert "test_server.browser.console (subnamespaces: 0, functions: 3)" in result
+        assert "test_server.browser.fill (subnamespaces: 0, functions: 3)" in result
 
 
 class TestBrowseToolsWithTypes:
@@ -705,11 +492,15 @@ class TestBrowseToolsWithTypes:
             Tool(name="api_users_delete", func=None, description="Delete user", parameters=None),
         ]
 
-        # Build folder structure using Folder.from_tools
-        root = Folder.from_tools(tools)
+        namespace_mappings = [
+            NamespaceMapping(tools=["api_users_*"], namespace="api.users")
+        ]
 
-        # Navigate to api.users folder where the tool should be (3+ tools = subfolder)
-        result = browse_tools(root, "api.users")
+        # Build folder structure using Folder.from_tools
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+
+        # Navigate to test_server.api.users folder where the tool should be
+        result = browse_tools(root, "test_server.api.users")
 
         # Should NOT show Types section (root schema is already in function params)
         assert "Types:" not in result
@@ -746,11 +537,15 @@ class TestBrowseToolsWithTypes:
             Tool(name="api_users_delete", func=None, description="Delete user", parameters=None),
         ]
 
-        # Build folder structure using Folder.from_tools
-        root = Folder.from_tools(tools)
+        namespace_mappings = [
+            NamespaceMapping(tools=["api_users_*"], namespace="api.users")
+        ]
 
-        # Navigate to api.users folder where the tool should be (3+ tools = subfolder)
-        result = browse_tools(root, "api.users")
+        # Build folder structure using Folder.from_tools
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+
+        # Navigate to test_server.api.users folder where the tool should be
+        result = browse_tools(root, "test_server.api.users")
 
         # Should show Types section with the nested TypedDict
         assert "Types:" in result
@@ -777,8 +572,12 @@ class TestBrowseToolsWithTypes:
             Tool(name="api_users_delete", func=None, description="Delete user", parameters=None),
         ]
 
-        root = Folder.from_tools(tools)
-        result = browse_tools(root, "api.users")
+        namespace_mappings = [
+            NamespaceMapping(tools=["api_users_*"], namespace="api.users")
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+        result = browse_tools(root, "test_server.api.users")
 
         # Should NOT show Types section
         assert "Types:" not in result
@@ -818,8 +617,12 @@ class TestBrowseToolsWithTypes:
             Tool(name="data_records_delete", func=None, description="Delete record", parameters=None),
         ]
 
-        root = Folder.from_tools(tools)
-        result = browse_tools(root, "data.records")
+        namespace_mappings = [
+            NamespaceMapping(tools=["data_records_*"], namespace="data.records")
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+        result = browse_tools(root, "test_server.data.records")
 
         # Should show Types section for array items
         assert "Types:" in result
@@ -877,8 +680,12 @@ class TestBrowseToolsWithTypes:
             parameters=None,
         )
 
-        root = Folder.from_tools([tool_with_nested, tool_without_nested, tool_extra])
-        result = browse_tools(root, "data.records")
+        namespace_mappings = [
+            NamespaceMapping(tools=["data_records_*"], namespace="data.records")
+        ]
+
+        root = Folder.from_tools([create_tool_group([tool_with_nested, tool_without_nested, tool_extra], namespace_mappings)])
+        result = browse_tools(root, "test_server.data.records")
 
         # Should show Types section only for tool_with_nested
         assert "Types:" in result
@@ -892,3 +699,687 @@ class TestBrowseToolsWithTypes:
         assert '"""Create record"""' in result
         assert "def delete(id: integer) -> Any:" in result
         assert '"""Delete record"""' in result
+
+
+class TestNamespaceMappings:
+    """Test suite for namespace mapping functionality."""
+
+    def test_simple_prefix_mapping(self):
+        """Test basic prefix to namespace mapping with server name prepended."""
+        tools = [
+            Tool(
+                name="mcp__playwright__browser_click",
+                func=None,
+                description="Click element",
+                parameters=None,
+            ),
+            Tool(
+                name="mcp__playwright__browser_navigate",
+                func=None,
+                description="Navigate to URL",
+                parameters=None,
+            ),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder (server name)
+        assert len(root.folders) == 1
+        assert root.folders[0].name == "test_server"
+
+        # test_server should have browser subfolder
+        test_server_folder = root.folders[0]
+        assert len(test_server_folder.folders) == 1
+        browser_folder = test_server_folder.folders[0]
+        assert browser_folder.name == "browser"
+
+        # Browser folder should have 2 tools
+        assert len(browser_folder.tools) == 2
+
+        # Original names should be preserved in tools
+        tool_names = [t.name for t in browser_folder.tools]
+        assert "mcp__playwright__browser_click" in tool_names
+        assert "mcp__playwright__browser_navigate" in tool_names
+
+    def test_nested_namespace_mapping(self):
+        """Test mapping to nested namespace with dots and server name prepended."""
+        tools = [
+            Tool(
+                name="mcp__playwright__browser_tools_click",
+                func=None,
+                description="Click element",
+                parameters=None,
+            ),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_tools_*"], namespace="browser.tools")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder (server name)
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have browser subfolder
+        assert len(test_server_folder.folders) == 1
+        browser_folder = test_server_folder.folders[0]
+        assert browser_folder.name == "browser"
+
+        # Browser should have tools subfolder
+        assert len(browser_folder.folders) == 1
+        tools_folder = browser_folder.folders[0]
+        assert tools_folder.name == "tools"
+
+        # Tools folder should have the click tool
+        assert len(tools_folder.tools) == 1
+        assert tools_folder.tools[0].name == "mcp__playwright__browser_tools_click"
+
+    def test_multiple_prefix_mappings(self):
+        """Test multiple prefix mappings in same config with server name prepended."""
+        tools = [
+            Tool(name="mcp__playwright__browser_click", func=None, description="", parameters=None),
+            Tool(name="mcp__playwright__browser_navigate", func=None, description="", parameters=None),
+            Tool(name="mcp__playwright__page_screenshot", func=None, description="", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser"),
+            NamespaceMapping(tools=["mcp__playwright__page_*"], namespace="page"),
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have browser and page subfolders
+        assert len(test_server_folder.folders) == 2
+        folder_names = {f.name for f in test_server_folder.folders}
+        assert "browser" in folder_names
+        assert "page" in folder_names
+
+        # Browser should have 2 tools
+        browser_folder = next(f for f in test_server_folder.folders if f.name == "browser")
+        assert len(browser_folder.tools) == 2
+
+        # Page should have 1 tool
+        page_folder = next(f for f in test_server_folder.folders if f.name == "page")
+        assert len(page_folder.tools) == 1
+
+    def test_unmapped_tools_go_under_server_name(self):
+        """Test that tools not matching any mapping go under server name."""
+        tools = [
+            Tool(name="mcp__playwright__browser_click", func=None, description="", parameters=None),
+            Tool(name="other_tool_something", func=None, description="", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have browser subfolder
+        assert len(test_server_folder.folders) == 1
+        browser_folder = test_server_folder.folders[0]
+        assert browser_folder.name == "browser"
+
+        # test_server should have the unmapped tool directly
+        assert len(test_server_folder.tools) == 1
+        assert test_server_folder.tools[0].name == "other_tool_something"
+
+    def test_builtins_always_at_root(self):
+        """Test that builtins are always at root regardless of mappings or server name."""
+        tools = [
+            Tool(name="builtins_print", func=None, description="", parameters=None),
+            Tool(name="mcp__playwright__browser_click", func=None, description="", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser"),
+            # Even if we try to map builtins, they should stay at root
+            NamespaceMapping(tools=["builtins_*"], namespace="utils"),
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Builtin should be at root
+        assert len(root.tools) == 1
+        assert root.tools[0].name == "builtins_print"
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have browser subfolder
+        assert len(test_server_folder.folders) == 1
+        assert test_server_folder.folders[0].name == "browser"
+
+    def test_multiple_tool_groups(self):
+        """Test combining tools from multiple servers with different mappings."""
+        playwright_tools = [
+            Tool(name="mcp__playwright__browser_click", func=None, description="", parameters=None),
+        ]
+        playwright_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        azure_tools = [
+            Tool(name="mcp__azure__devops_get_projects", func=None, description="", parameters=None),
+        ]
+        azure_mappings = [
+            NamespaceMapping(tools=["mcp__azure__devops_*"], namespace="azure.devops")
+        ]
+
+        # Create tool groups with different server names
+        config1 = MCPServerConfig(
+            name="playwright",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=playwright_mappings,
+        )
+        playwright_group = ToolGroup(server_config=config1, tools=playwright_tools)
+
+        config2 = MCPServerConfig(
+            name="azure",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=azure_mappings,
+        )
+        azure_group = ToolGroup(server_config=config2, tools=azure_tools)
+
+        root = Folder.from_tools([playwright_group, azure_group])
+
+        # Should have playwright and azure folders (server names)
+        assert len(root.folders) == 2
+        folder_names = {f.name for f in root.folders}
+        assert "playwright" in folder_names
+        assert "azure" in folder_names
+
+        # Playwright should have browser subfolder
+        playwright_folder = next(f for f in root.folders if f.name == "playwright")
+        assert len(playwright_folder.folders) == 1
+        assert playwright_folder.folders[0].name == "browser"
+
+        # Azure should have azure subfolder, then devops subfolder
+        azure_folder = next(f for f in root.folders if f.name == "azure")
+        assert len(azure_folder.folders) == 1
+        azure_sub_folder = azure_folder.folders[0]
+        assert azure_sub_folder.name == "azure"
+        assert len(azure_sub_folder.folders) == 1
+        assert azure_sub_folder.folders[0].name == "devops"
+
+    def test_empty_remaining_name(self):
+        """Test when prefix exactly matches tool name (no remaining part) with server name."""
+        tools = [
+            Tool(name="mcp__playwright__browser", func=None, description="", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__*"], namespace="playwright")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have playwright subfolder
+        assert len(test_server_folder.folders) == 1
+        playwright_folder = test_server_folder.folders[0]
+        assert playwright_folder.name == "playwright"
+
+        # Tool should be in the playwright folder (remaining name was "browser")
+        assert len(playwright_folder.tools) == 1
+
+    def test_browse_with_namespace_mapping(self):
+        """Test browse_tools output with namespace mappings and server name prefix."""
+        tools = [
+            Tool(
+                name="mcp__playwright__browser_click",
+                func=None,
+                description="Click on element",
+                parameters=[ToolParameter(name="selector", type="string")],
+            ),
+            Tool(
+                name="mcp__playwright__browser_navigate",
+                func=None,
+                description="Navigate to URL",
+                parameters=[ToolParameter(name="url", type="string")],
+            ),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Browse root - should show test_server
+        result = browse_tools(root, "")
+        assert "Namespaces:" in result
+        assert "test_server (subnamespaces: 1, functions: 0)" in result
+
+        # Browse test_server namespace - should show browser
+        result = browse_tools(root, "test_server")
+        assert "Namespaces:" in result
+        assert "test_server.browser (subnamespaces: 0, functions: 2)" in result
+
+        # Browse test_server.browser namespace - should show functions
+        result = browse_tools(root, "test_server.browser")
+        assert "Functions:" in result
+        assert "def click(selector: string) -> Any:" in result
+        assert '"""Click on element"""' in result
+        assert "def navigate(url: string) -> Any:" in result
+        assert '"""Navigate to URL"""' in result
+
+    def test_suffix_pattern_mapping(self):
+        """Test suffix pattern (*name) for matching tools ending with a suffix."""
+        tools = [
+            Tool(name="get_user", func=None, description="Get user", parameters=None),
+            Tool(name="fetch_user", func=None, description="Fetch user", parameters=None),
+            Tool(name="create_product", func=None, description="Create product", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["*_user"], namespace="users")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have users subfolder
+        assert len(test_server_folder.folders) == 1
+        users_folder = test_server_folder.folders[0]
+        assert users_folder.name == "users"
+
+        # Users folder should have 2 tools (get and fetch)
+        assert len(users_folder.tools) == 2
+        tool_names = [t.name for t in users_folder.tools]
+        assert "get_user" in tool_names
+        assert "fetch_user" in tool_names
+
+        # create_product should be directly under test_server
+        assert len(test_server_folder.tools) == 1
+        assert test_server_folder.tools[0].name == "create_product"
+
+    def test_substring_pattern_mapping(self):
+        """Test substring pattern (*name*) for matching tools containing a substring."""
+        tools = [
+            Tool(name="fetch_user_data", func=None, description="Fetch user data", parameters=None),
+            Tool(name="get_user_profile", func=None, description="Get user profile", parameters=None),
+            Tool(name="get_product", func=None, description="Get product", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["*user*"], namespace="users")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have users subfolder
+        assert len(test_server_folder.folders) == 1
+        users_folder = test_server_folder.folders[0]
+        assert users_folder.name == "users"
+
+        # Users folder should have 2 tools (both containing 'user')
+        assert len(users_folder.tools) == 2
+        tool_names = [t.name for t in users_folder.tools]
+        assert "fetch_user_data" in tool_names
+        assert "get_user_profile" in tool_names
+
+        # get_product should be directly under test_server
+        assert len(test_server_folder.tools) == 1
+        assert test_server_folder.tools[0].name == "get_product"
+
+    def test_multiple_patterns_in_one_mapping(self):
+        """Test multiple patterns in a single namespace mapping."""
+        tools = [
+            Tool(name="browser_click", func=None, description="Click", parameters=None),
+            Tool(name="browser_navigate", func=None, description="Navigate", parameters=None),
+            Tool(name="page_screenshot", func=None, description="Screenshot", parameters=None),
+            Tool(name="page_title", func=None, description="Get title", parameters=None),
+            Tool(name="network_request", func=None, description="Request", parameters=None),
+        ]
+
+        namespace_mappings = [
+            # Multiple patterns in one mapping go to the same namespace
+            NamespaceMapping(tools=["browser_*", "page_*"], namespace="playwright")
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+        assert test_server_folder.name == "test_server"
+
+        # test_server should have playwright subfolder
+        assert len(test_server_folder.folders) == 1
+        playwright_folder = test_server_folder.folders[0]
+        assert playwright_folder.name == "playwright"
+
+        # Playwright folder should have 4 tools (browser_* and page_*)
+        assert len(playwright_folder.tools) == 4
+        tool_names = [t.name for t in playwright_folder.tools]
+        assert "browser_click" in tool_names
+        assert "browser_navigate" in tool_names
+        assert "page_screenshot" in tool_names
+        assert "page_title" in tool_names
+
+        # network_request should be directly under test_server
+        assert len(test_server_folder.tools) == 1
+        assert test_server_folder.tools[0].name == "network_request"
+
+    def test_pattern_priority_first_match_wins(self):
+        """Test that first matching pattern wins when multiple patterns could match."""
+        tools = [
+            Tool(name="browser_console_log", func=None, description="Log", parameters=None),
+        ]
+
+        namespace_mappings = [
+            # Both patterns would match, but first should win
+            NamespaceMapping(tools=["browser_*", "*_log"], namespace="first"),
+            NamespaceMapping(tools=["*console*"], namespace="second"),
+        ]
+
+        tool_group = create_tool_group(tools, namespace_mappings)
+        root = Folder.from_tools([tool_group])
+
+        # Should have test_server folder
+        assert len(root.folders) == 1
+        test_server_folder = root.folders[0]
+
+        # test_server should have 'first' subfolder (first pattern matched)
+        assert len(test_server_folder.folders) == 1
+        first_folder = test_server_folder.folders[0]
+        assert first_folder.name == "first"
+
+        # Tool should be in first folder
+        assert len(first_folder.tools) == 1
+        assert first_folder.tools[0].name == "browser_console_log"
+
+    def test_playwright_namespace_structure_from_switchboard_yaml(self):
+        """Test comprehensive playwright namespace structure matching switchboard.yaml config."""
+        # Simulate the actual playwright tools (as they come from the MCP server)
+        tools = [
+            # Navigation & Control
+            Tool(name="browser_navigate", func=None, description="Navigate", parameters=None),
+            Tool(name="browser_navigate_back", func=None, description="Back", parameters=None),
+            Tool(name="browser_close", func=None, description="Close", parameters=None),
+            Tool(name="browser_install", func=None, description="Install", parameters=None),
+            # Page Interaction
+            Tool(name="browser_click", func=None, description="Click", parameters=None),
+            Tool(name="browser_hover", func=None, description="Hover", parameters=None),
+            Tool(name="browser_drag", func=None, description="Drag", parameters=None),
+            Tool(name="browser_type", func=None, description="Type", parameters=None),
+            Tool(name="browser_press_key", func=None, description="Press key", parameters=None),
+            # Form Handling
+            Tool(name="browser_fill_form", func=None, description="Fill form", parameters=None),
+            Tool(name="browser_file_upload", func=None, description="Upload", parameters=None),
+            Tool(name="browser_select_option", func=None, description="Select", parameters=None),
+            # Information Gathering
+            Tool(name="browser_snapshot", func=None, description="Snapshot", parameters=None),
+            Tool(name="browser_take_screenshot", func=None, description="Screenshot", parameters=None),
+            Tool(name="browser_console_messages", func=None, description="Console", parameters=None),
+            Tool(name="browser_network_requests", func=None, description="Network", parameters=None),
+            # Window & Dialog Management
+            Tool(name="browser_resize", func=None, description="Resize", parameters=None),
+            Tool(name="browser_tabs", func=None, description="Tabs", parameters=None),
+            Tool(name="browser_handle_dialog", func=None, description="Dialog", parameters=None),
+            # Advanced
+            Tool(name="browser_evaluate", func=None, description="Evaluate", parameters=None),
+            Tool(name="browser_run_code", func=None, description="Code", parameters=None),
+            Tool(name="browser_wait_for", func=None, description="Wait", parameters=None),
+        ]
+
+        # Namespace mappings matching switchboard.yaml
+        namespace_mappings = [
+            NamespaceMapping(
+                namespace="navigation",
+                tools=[
+                    "browser_navigate*",
+                    "browser_navigate_back",
+                    "browser_close",
+                    "browser_install",
+                ]
+            ),
+            NamespaceMapping(
+                namespace="interaction",
+                tools=[
+                    "browser_click",
+                    "browser_hover",
+                    "browser_drag",
+                    "browser_type",
+                    "browser_press_key",
+                ]
+            ),
+            NamespaceMapping(
+                namespace="forms",
+                tools=[
+                    "browser_fill_form",
+                    "browser_file_upload",
+                    "browser_select_option",
+                ]
+            ),
+            NamespaceMapping(
+                namespace="inspection",
+                tools=[
+                    "browser_snapshot",
+                    "browser_take_screenshot",
+                    "browser_console_messages",
+                    "browser_network_requests",
+                ]
+            ),
+            NamespaceMapping(
+                namespace="windows",
+                tools=[
+                    "browser_resize",
+                    "browser_tabs",
+                    "browser_handle_dialog",
+                ]
+            ),
+            NamespaceMapping(
+                namespace="advanced",
+                tools=[
+                    "browser_evaluate",
+                    "browser_run_code",
+                    "browser_wait_for",
+                ]
+            ),
+        ]
+
+        # Create tool group with "playwright" server name to match switchboard.yaml
+        config = MCPServerConfig(
+            name="playwright",
+            stdio=StdioConfig(command="npx", args=["@playwright/mcp@latest"]),
+            namespace_mappings=namespace_mappings,
+            remove_prefix="browser_",  # Match switchboard.yaml
+        )
+        tool_group = ToolGroup(server_config=config, tools=tools)
+        root = Folder.from_tools([tool_group])
+
+        # Should have playwright folder at root
+        assert len(root.folders) == 1
+        playwright_folder = root.folders[0]
+        assert playwright_folder.name == "playwright"
+
+        # Should have 6 namespace subfolders
+        assert len(playwright_folder.folders) == 6
+        namespace_names = {f.name for f in playwright_folder.folders}
+        assert namespace_names == {"navigation", "interaction", "forms", "inspection", "windows", "advanced"}
+
+        # Verify each namespace has the correct tools with PREFIX REMOVED
+        navigation_folder = next(f for f in playwright_folder.folders if f.name == "navigation")
+        assert len(navigation_folder.tools) == 4
+        nav_tool_names = {t.name for t in navigation_folder.tools}
+        # After prefix removal: mcp__playwright__browser_navigate -> navigate
+        assert "navigate" in nav_tool_names
+        assert "navigate_back" in nav_tool_names
+        assert "close" in nav_tool_names
+        assert "install" in nav_tool_names
+
+        interaction_folder = next(f for f in playwright_folder.folders if f.name == "interaction")
+        assert len(interaction_folder.tools) == 5
+
+        forms_folder = next(f for f in playwright_folder.folders if f.name == "forms")
+        assert len(forms_folder.tools) == 3
+
+        inspection_folder = next(f for f in playwright_folder.folders if f.name == "inspection")
+        assert len(inspection_folder.tools) == 4
+
+        windows_folder = next(f for f in playwright_folder.folders if f.name == "windows")
+        assert len(windows_folder.tools) == 3
+
+        advanced_folder = next(f for f in playwright_folder.folders if f.name == "advanced")
+        assert len(advanced_folder.tools) == 3
+
+        # Test browsing the structure
+        result = browse_tools(root, "playwright")
+        assert "Namespaces:" in result
+        assert "playwright.navigation" in result
+        assert "playwright.interaction" in result
+        assert "playwright.forms" in result
+        assert "playwright.inspection" in result
+        assert "playwright.windows" in result
+        assert "playwright.advanced" in result
+
+        # Test browsing a specific namespace shows tools with shortened names
+        result = browse_tools(root, "playwright.navigation")
+        assert "Functions:" in result
+        # With remove_prefix, tools should have clean names
+        assert "navigate" in result.lower()
+        # Should NOT have the prefixed name (browser_ prefix should be removed)
+        assert "browser_navigate" not in result
+
+    def test_remove_prefix_configuration(self):
+        """Test that remove_prefix configuration strips prefix from tool names."""
+        tools = [
+            Tool(name="mcp__playwright__browser_click", func=None, description="Click", parameters=None),
+            Tool(name="mcp__playwright__browser_navigate", func=None, description="Navigate", parameters=None),
+            Tool(name="mcp__playwright__browser_type", func=None, description="Type", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        # Create config with remove_prefix
+        config = MCPServerConfig(
+            name="playwright",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=namespace_mappings,
+            remove_prefix="mcp__playwright__browser_",
+        )
+        tool_group = ToolGroup(server_config=config, tools=tools)
+        root = Folder.from_tools([tool_group])
+
+        # Should have playwright folder
+        assert len(root.folders) == 1
+        playwright_folder = root.folders[0]
+        assert playwright_folder.name == "playwright"
+
+        # Should have browser subfolder
+        assert len(playwright_folder.folders) == 1
+        browser_folder = playwright_folder.folders[0]
+        assert browser_folder.name == "browser"
+
+        # Tools should have prefix removed
+        assert len(browser_folder.tools) == 3
+        tool_names = {t.name for t in browser_folder.tools}
+        assert tool_names == {"click", "navigate", "type"}
+
+        # Verify original names are NOT in the tools
+        assert "mcp__playwright__browser_click" not in tool_names
+
+    def test_remove_prefix_only_matching_tools(self):
+        """Test that remove_prefix only affects tools that start with the prefix."""
+        tools = [
+            Tool(name="mcp__playwright__browser_click", func=None, description="Click", parameters=None),
+            Tool(name="other_tool", func=None, description="Other", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        config = MCPServerConfig(
+            name="playwright",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=namespace_mappings,
+            remove_prefix="mcp__playwright__browser_",
+        )
+        tool_group = ToolGroup(server_config=config, tools=tools)
+        root = Folder.from_tools([tool_group])
+
+        playwright_folder = root.folders[0]
+        browser_folder = playwright_folder.folders[0]
+
+        # Tool with prefix should have it removed
+        browser_tool_names = {t.name for t in browser_folder.tools}
+        assert "click" in browser_tool_names
+        assert "mcp__playwright__browser_click" not in browser_tool_names
+
+        # Tool without prefix should keep its original name
+        assert len(playwright_folder.tools) == 1
+        assert playwright_folder.tools[0].name == "other_tool"
+
+    def test_no_remove_prefix_preserves_names(self):
+        """Test that without remove_prefix, tool names are preserved."""
+        tools = [
+            Tool(name="mcp__playwright__browser_click", func=None, description="Click", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__playwright__browser_*"], namespace="browser")
+        ]
+
+        config = MCPServerConfig(
+            name="playwright",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=namespace_mappings,
+            # No remove_prefix configured
+        )
+        tool_group = ToolGroup(server_config=config, tools=tools)
+        root = Folder.from_tools([tool_group])
+
+        playwright_folder = root.folders[0]
+        browser_folder = playwright_folder.folders[0]
+
+        # Tool should keep full name
+        assert len(browser_folder.tools) == 1
+        assert browser_folder.tools[0].name == "mcp__playwright__browser_click"
