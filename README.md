@@ -1,13 +1,45 @@
 # Switchboard MCP
 
-The idea of this MCP server is to give user a possibility to still include various MCP tools without killing the context.
-This is the experimental MCP server which goals is to explore how we could decrease the context size used by MCP hosts.
+An aggregator MCP server that connects multiple MCP servers into a unified interface while minimizing context usage. Think of it as a switchboard operator routing between different services.
 
-It tries to cover two things discovery and tool calling:
+**The Problem**: MCP clients typically load all tool definitions into context upfront. With 5+ MCP servers providing 100+ tools, you quickly hit context limits, forcing you to choose between having many tools available or having room for actual conversation.
 
-1. **Discovery** - Most clients list all MCP tools and include all their tools in the context. This means that you can either have a fewer tools enabled or have less context for your instruction/conversation. This MCP give's the possibility to list tools in a hierarchical way. So you don't need to decide which tools you could need neither sacrifice your context for something you probably will not need.
+**The Experiment**: This project tests two strategies to reduce context consumption:
 
-2. **Tool calling** - Right now MCP is designed in a way that the tool is called by MCP host and the data are returned back. The MCP host can use them to call other tool if decides so. This isn't really efficient especially if the data are large. Let's say that the tool want to retrieve data and display them in the graph. This can/is solved by allowing the MCP host the code execution or send-boxed code execution. This on the other hand seems too big. In our experiment we give the MCP host possibility to execute minimal python dsl ([simple script](SIMPLE_SCRIPT.md)). This is the minimum to get MCP host chance to do the basic tool calling and passing parameters around without the full code execution.
+## 1. Hierarchical Discovery
+
+Instead of loading all tools at once, organize them in namespaces and load definitions on-demand:
+
+```
+❌ Flat (loads 100 tool definitions immediately):
+playwright_browser_navigate, playwright_browser_click, playwright_browser_snapshot, ...
+
+✅ Hierarchical (loads structure first, details when browsing):
+playwright/
+  ├─ navigation/     (4 tools)
+  ├─ interaction/    (5 tools)
+  └─ inspection/     (4 tools)
+```
+
+Browse `playwright.navigation` → only then load those 4 tool definitions into context.
+
+## 2. Minimal Script Execution
+
+Enable basic tool composition without full code execution. Instead of:
+1. MCP Host → Tool A → returns large dataset → MCP Host
+2. MCP Host processes data → Tool B → MCP Host
+3. MCP Host → Tool C with transformed data
+
+Run a simple script:
+```python
+from api import fetch_data, transform
+from graph import plot
+data = fetch_data("endpoint")
+result = transform(data)
+plot(result)
+```
+
+The data stays server-side, only final output returns to the host. Uses a minimal Python-like DSL ([simple script](SIMPLE_SCRIPT.md)) - not full Python execution.
 
 ## Simple Script
 
