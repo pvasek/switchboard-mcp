@@ -1,0 +1,49 @@
+servers:
+  - name: playwright
+    stdio:
+      command: npx
+      args:
+        - "@playwright/mcp@latest"
+      env:
+        PATH: "/Users/pavelvasek/.nvm/versions/node/v22.9.0/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+    remove_prefix: "browser_"
+    namespace_mappings:
+      - namespace: "navigation"
+        tools:
+          - "browser_navigate*"
+          - "browser_navigate_back"
+          - "browser_close"
+          - "browser_install"
+
+      - namespace: "interaction"
+        tools:
+          - "browser_click"
+          - "browser_hover"
+          - "browser_drag"
+          - "browser_type"
+          - "browser_press_key"
+
+      - namespace: "forms"
+        tools:
+          - "browser_fill_form"
+          - "browser_file_upload"
+          - "browser_select_option"
+
+      - namespace: "inspection"
+        tools:
+          - "browser_snapshot"
+          - "browser_take_screenshot"
+          - "browser_console_messages"
+          - "browser_network_requests"
+
+      - namespace: "windows"
+        tools:
+          - "browser_resize"
+          - "browser_tabs"
+          - "browser_handle_dialog"
+
+      - namespace: "advanced"
+        tools:
+          - "browser_evaluate"
+          - "browser_run_code"
+          - "browser_wait_for"
