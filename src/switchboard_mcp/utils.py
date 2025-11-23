@@ -20,11 +20,11 @@ class Folder:
 
     @classmethod
     def from_tools(cls, tool_groups: list[ToolGroup]) -> Folder:
-        """Build a hierarchical folder structure from tool groups with namespace mappings.
+        """Build a hierarchical folder structure from tool groups with module mappings.
 
         For each tool:
         - Tools starting with 'builtins_' are added directly to root
-        - Tools matching a namespace mapping pattern are placed under: server_name.namespace.remaining
+        - Tools matching a module mapping pattern are placed under: server_name.module.remaining
           Patterns support: name* (prefix), *name (suffix), *name* (contains)
         - Tools not matching any mapping are placed under: server_name.tool_name
         """
@@ -53,7 +53,7 @@ class Folder:
                         inputSchema=tool.inputSchema,
                     )
 
-                # Try to apply namespace mappings
+                # Try to apply module mappings
                 mapped = False
                 if tool_group.server_config.namespace_mappings:
                     for mapping in tool_group.server_config.namespace_mappings:
@@ -61,9 +61,9 @@ class Folder:
                         # Use original tool name for pattern matching
                         for pattern in mapping.tools:
                             if _match_pattern(tool.name, pattern):
-                                # Split namespace by dots to create folder hierarchy
+                                # Split module by dots to create folder hierarchy
                                 namespace_parts = mapping.namespace.split(".")
-                                # Prepend server name to namespace path
+                                # Prepend server name to module path
                                 full_path = [server_name] + namespace_parts
 
                                 # Navigate/create folder hierarchy and add tool (with prefix removed if configured)
@@ -132,7 +132,7 @@ def _add_tool_to_path(root: Folder, path: list[str], tool: Tool) -> None:
 
     Args:
         root: The root folder to start from
-        path: List of folder names (e.g., ['server_name', 'namespace'])
+        path: List of folder names (e.g., ['server_name', 'module'])
         tool: The tool to add (keeps its original full name)
     """
     if not path:
@@ -338,14 +338,14 @@ def _json_type_to_python(schema: dict[str, Any]) -> str:
 def browse_tools(root: Folder, path: str = "") -> str:
     """
     Browse tools organized in a hierarchical structure using dot notation.
-    Shows subnamespaces and functions with their parameters and descriptions.
+    Shows submodules and functions with their parameters and descriptions.
 
     Args:
         path: Dot-separated path (e.g., "math.statistics")
               Empty string or no argument lists root level
 
     Returns:
-        String with subnamespaces listed first, then functions with parameters and descriptions
+        String with submodules listed first, then functions with parameters and descriptions
     """
 
     parts = [i for i in path.split(".") if i != ""]
@@ -357,7 +357,7 @@ def browse_tools(root: Folder, path: str = "") -> str:
             return f"Path '{path}' not found."
         current_folder = folder
 
-    # Build full paths for subnamespaces with counts
+    # Build full paths for submodules with counts
     current_path = path if path else ""
     subnamespaces = []
     for f in current_folder.folders:
@@ -366,7 +366,7 @@ def browse_tools(root: Folder, path: str = "") -> str:
         else:
             full_path = f.name
 
-        # Count subnamespaces and functions in this folder
+        # Count submodules and functions in this folder
         num_subnamespaces = len(f.folders)
         num_functions = len(f.tools)
 
@@ -374,12 +374,12 @@ def browse_tools(root: Folder, path: str = "") -> str:
 
     result_parts = []
 
-    # 1. Show subnamespaces with counts
+    # 1. Show submodules with counts
     if subnamespaces:
-        result_parts.append("Namespaces:")
+        result_parts.append("Modules:")
         for ns_path, num_sub, num_func in subnamespaces:
             result_parts.append(
-                f"  {ns_path} (subnamespaces: {num_sub}, functions: {num_func})"
+                f"  {ns_path} (submodules: {num_sub}, functions: {num_func})"
             )
 
     # 2. Show types (only nested types from inputSchema, not root types)

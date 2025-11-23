@@ -47,3 +47,14 @@ servers:
           - "browser_evaluate"
           - "browser_run_code"
           - "browser_wait_for"
+  - name: motherduck
+    stdio:
+      command: uvx
+      args:
+        - mcp-server-motherduck
+        - --db-path
+        - ":memory:"
+  # - name: github
+  #   http:
+  #     url: "https://api.githubcopilot.com/mcp/"
+    

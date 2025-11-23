@@ -149,7 +149,7 @@ tools = [*math_mcp]
 def browse_tools(ctx: RunContext[Services], path: str = "") -> str:
     """
     Browse tools organized in a hierarchical structure using dot notation.
-    Shows subnamespaces and functions with their parameters and descriptions.
+    Shows submodules and functions with their parameters and descriptions.
 
 
     Args:
@@ -157,7 +157,7 @@ def browse_tools(ctx: RunContext[Services], path: str = "") -> str:
               Empty string or no argument lists root level - that should be the first thing to check
 
     Returns:
-        String with subnamespaces listed first, then functions with parameters and descriptions
+        String with submodules listed first, then functions with parameters and descriptions
     """
 
     print(f"browse_tools(path: '{path}')")

@@ -26,7 +26,7 @@ class SSEConfig:
 
 @dataclass
 class NamespaceMapping:
-    """Defines how to map tool name patterns to namespaces.
+    """Defines how to map tool name patterns to modules.
 
     Supports glob-like patterns:
     - name* : matches tools starting with 'name'
@@ -69,7 +69,7 @@ class MCPServerConfig:
             if "sse" in server_data:
                 sse = SSEConfig(**server_data["sse"])
 
-            # Parse namespace mappings if present
+            # Parse module mappings if present
             namespace_mappings = None
             if "namespace_mappings" in server_data:
                 namespace_mappings = [

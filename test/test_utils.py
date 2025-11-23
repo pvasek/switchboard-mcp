@@ -388,10 +388,10 @@ class TestExtractNestedTypes:
 
 
 class TestBrowseToolsWithCounts:
-    """Test suite for browse_tools namespace counts."""
+    """Test suite for browse_tools module counts."""
 
-    def test_subnamespaces_show_counts(self):
-        """Test that subnamespaces show counts of their contents."""
+    def test_submodules_show_counts(self):
+        """Test that submodules show counts of their contents."""
         # Create a hierarchy: root -> api -> users (3 tools), products (3 tools)
         tools = [
             Tool(
@@ -432,7 +432,7 @@ class TestBrowseToolsWithCounts:
             ),
         ]
 
-        # Without namespace mappings, all tools go under server name
+        # Without module mappings, all tools go under server name
         root = Folder.from_tools([create_tool_group(tools)])
 
         # Should have test_server folder
@@ -443,8 +443,8 @@ class TestBrowseToolsWithCounts:
         # All tools should be directly under test_server
         assert len(test_server_folder.tools) == 6
 
-    def test_nested_subnamespaces_show_counts(self):
-        """Test deeply nested subnamespaces show correct counts with namespace mapping."""
+    def test_nested_submodules_show_counts(self):
+        """Test deeply nested submodules show correct counts with module mapping."""
         tools = [
             Tool(name="browser_console_messages_get", func=None, description="Get messages", parameters=None),
             Tool(name="browser_console_errors_get", func=None, description="Get errors", parameters=None),
@@ -463,9 +463,9 @@ class TestBrowseToolsWithCounts:
 
         # Check test_server.browser level
         result = browse_tools(root, "test_server.browser")
-        assert "Namespaces:" in result
-        assert "test_server.browser.console (subnamespaces: 0, functions: 3)" in result
-        assert "test_server.browser.fill (subnamespaces: 0, functions: 3)" in result
+        assert "Modules:" in result
+        assert "test_server.browser.console (submodules: 0, functions: 3)" in result
+        assert "test_server.browser.fill (submodules: 0, functions: 3)" in result
 
 
 class TestBrowseToolsWithTypes:
@@ -702,10 +702,10 @@ class TestBrowseToolsWithTypes:
 
 
 class TestNamespaceMappings:
-    """Test suite for namespace mapping functionality."""
+    """Test suite for module mapping functionality."""
 
     def test_simple_prefix_mapping(self):
-        """Test basic prefix to namespace mapping with server name prepended."""
+        """Test basic prefix to module mapping with server name prepended."""
         tools = [
             Tool(
                 name="mcp__playwright__browser_click",
@@ -747,7 +747,7 @@ class TestNamespaceMappings:
         assert "mcp__playwright__browser_navigate" in tool_names
 
     def test_nested_namespace_mapping(self):
-        """Test mapping to nested namespace with dots and server name prepended."""
+        """Test mapping to nested module with dots and server name prepended."""
         tools = [
             Tool(
                 name="mcp__playwright__browser_tools_click",
@@ -954,7 +954,7 @@ class TestNamespaceMappings:
         assert len(playwright_folder.tools) == 1
 
     def test_browse_with_namespace_mapping(self):
-        """Test browse_tools output with namespace mappings and server name prefix."""
+        """Test browse_tools output with module mappings and server name prefix."""
         tools = [
             Tool(
                 name="mcp__playwright__browser_click",
@@ -979,15 +979,15 @@ class TestNamespaceMappings:
 
         # Browse root - should show test_server
         result = browse_tools(root, "")
-        assert "Namespaces:" in result
-        assert "test_server (subnamespaces: 1, functions: 0)" in result
+        assert "Modules:" in result
+        assert "test_server (submodules: 1, functions: 0)" in result
 
-        # Browse test_server namespace - should show browser
+        # Browse test_server module - should show browser
         result = browse_tools(root, "test_server")
-        assert "Namespaces:" in result
-        assert "test_server.browser (subnamespaces: 0, functions: 2)" in result
+        assert "Modules:" in result
+        assert "test_server.browser (submodules: 0, functions: 2)" in result
 
-        # Browse test_server.browser namespace - should show functions
+        # Browse test_server.browser module - should show functions
         result = browse_tools(root, "test_server.browser")
         assert "Functions:" in result
         assert "def click(selector: string) -> Any:" in result
@@ -1066,7 +1066,7 @@ class TestNamespaceMappings:
         assert test_server_folder.tools[0].name == "get_product"
 
     def test_multiple_patterns_in_one_mapping(self):
-        """Test multiple patterns in a single namespace mapping."""
+        """Test multiple patterns in a single module mapping."""
         tools = [
             Tool(name="browser_click", func=None, description="Click", parameters=None),
             Tool(name="browser_navigate", func=None, description="Navigate", parameters=None),
@@ -1076,7 +1076,7 @@ class TestNamespaceMappings:
         ]
 
         namespace_mappings = [
-            # Multiple patterns in one mapping go to the same namespace
+            # Multiple patterns in one mapping go to the same module
             NamespaceMapping(tools=["browser_*", "page_*"], namespace="playwright")
         ]
 
@@ -1134,7 +1134,7 @@ class TestNamespaceMappings:
         assert first_folder.tools[0].name == "browser_console_log"
 
     def test_playwright_namespace_structure_from_switchboard_yaml(self):
-        """Test comprehensive playwright namespace structure matching switchboard.yaml config."""
+        """Test comprehensive playwright module structure matching switchboard.yaml config."""
         # Simulate the actual playwright tools (as they come from the MCP server)
         tools = [
             # Navigation & Control
@@ -1238,12 +1238,12 @@ class TestNamespaceMappings:
         playwright_folder = root.folders[0]
         assert playwright_folder.name == "playwright"
 
-        # Should have 6 namespace subfolders
+        # Should have 6 module subfolders
         assert len(playwright_folder.folders) == 6
         namespace_names = {f.name for f in playwright_folder.folders}
         assert namespace_names == {"navigation", "interaction", "forms", "inspection", "windows", "advanced"}
 
-        # Verify each namespace has the correct tools with PREFIX REMOVED
+        # Verify each module has the correct tools with PREFIX REMOVED
         navigation_folder = next(f for f in playwright_folder.folders if f.name == "navigation")
         assert len(navigation_folder.tools) == 4
         nav_tool_names = {t.name for t in navigation_folder.tools}
@@ -1270,7 +1270,7 @@ class TestNamespaceMappings:
 
         # Test browsing the structure
         result = browse_tools(root, "playwright")
-        assert "Namespaces:" in result
+        assert "Modules:" in result
         assert "playwright.navigation" in result
         assert "playwright.interaction" in result
         assert "playwright.forms" in result
@@ -1278,7 +1278,7 @@ class TestNamespaceMappings:
         assert "playwright.windows" in result
         assert "playwright.advanced" in result
 
-        # Test browsing a specific namespace shows tools with shortened names
+        # Test browsing a specific module shows tools with shortened names
         result = browse_tools(root, "playwright.navigation")
         assert "Functions:" in result
         # With remove_prefix, tools should have clean names

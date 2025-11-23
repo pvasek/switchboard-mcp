@@ -8,7 +8,7 @@ An aggregator MCP server that connects multiple MCP servers into a unified inter
 
 ## 1. Hierarchical Discovery
 
-Instead of loading all tools at once, organize them in namespaces and load definitions on-demand:
+Instead of loading all tools at once, organize them in modules and load definitions on-demand:
 
 ```
 ❌ Flat (loads 100 tool definitions immediately):
@@ -59,7 +59,7 @@ Configure MCP servers in `switchboard.yaml`:
 
 ```yaml
 servers:
-  - name: playwright                    # Server name (becomes root namespace)
+  - name: playwright                    # Server name (becomes root module)
     stdio:
       command: npx
       args:
@@ -70,7 +70,7 @@ servers:
     # Optional: Strip common prefix from tool names
     remove_prefix: "browser_"
 
-    # Optional: Organize tools into namespaces
+    # Optional: Organize tools into modules
     namespace_mappings:
       - namespace: "navigation"         # Creates playwright.navigation
         tools:
@@ -93,7 +93,7 @@ Original tools from playwright MCP:
 browser_navigate, browser_click, browser_hover, ...
 ```
 
-After organization with `remove_prefix: "browser_"` and namespace mappings:
+After organization with `remove_prefix: "browser_"` and module mappings:
 ```
 playwright.navigation.navigate()      # browser_navigate → navigate
 playwright.navigation.close()         # browser_close → close
@@ -113,7 +113,7 @@ src/switchboard_mcp/
 └── server.py           # FastMCP server with browse_tools/execute_script
 
 test/
-└── test_utils.py       # Tests for namespace mapping, prefix removal
+└── test_utils.py       # Tests for module mapping, prefix removal
 
 switchboard.yaml        # Server configuration
 ```

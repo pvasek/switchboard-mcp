@@ -143,7 +143,7 @@ class MCPTestClient:
                     for param_name, param_info in properties.items():
                         param_type = param_info.get("type", "any")
                         param_desc = param_info.get("description", "")
-                        print(f"     - {param_name} ({param_type}): {param_desc}")
+                        print(f"     - {param_name} ({param_type}) {param_desc}")
             print()
 
         print("-" * 80)
