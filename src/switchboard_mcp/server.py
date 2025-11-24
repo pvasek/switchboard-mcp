@@ -21,17 +21,9 @@ async def setup_tools():
             root = Folder.from_tools(tool_groups)
             return utils.browse_tools(root, path)
 
-        browse_tools_docs = f"""Browse tools organized in a hierarchical structure (as python modules) using dot notation.
-Shows submodules and functions with their parameters and descriptions.
-If you want to use any of this tool you can write a python script and pass it to the 'execute_script' tool.    
+        browse_tools_docs = f"""{utils.browse_tools.__doc__}
 
-Args:
-    path: Dot-separated path (e.g., "math.statistics")
-        Empty string or no argument lists root level
-
-Returns:
-    String with submodules listed first, then functions with parameters and descriptions
-
+Root modules:
 {browse_tools("")}
 """
 

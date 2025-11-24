@@ -335,20 +335,66 @@ def _json_type_to_python(schema: dict[str, Any]) -> str:
     return "Any"
 
 
+def _collect_all_tools_recursive(
+    folder: Folder, current_path: str
+) -> list[tuple[str, Tool]]:
+    """
+    Recursively collect all tools from a folder and its subfolders.
+
+    Args:
+        folder: The folder to collect tools from
+        current_path: The current path prefix for this folder
+
+    Returns:
+        List of (full_path, tool) tuples
+    """
+    results = []
+
+    # Add tools from current folder
+    for tool in folder.tools:
+        results.append((current_path, tool))
+
+    # Recursively collect from subfolders
+    for subfolder in folder.folders:
+        subfolder_path = (
+            f"{current_path}.{subfolder.name}" if current_path else subfolder.name
+        )
+        results.extend(_collect_all_tools_recursive(subfolder, subfolder_path))
+
+    return results
+
+
 def browse_tools(root: Folder, path: str = "") -> str:
     """
-    Browse tools organized in a hierarchical structure using dot notation.
+    Browse MCP tools organized in a hierarchical structure using dot notation.
     Shows submodules and functions with their parameters and descriptions.
+
+    IMPORTANT: These are MCP TOOLS, not Python functions. Each "function" is a remote call
+    to an external MCP server (e.g., Playwright for browser automation, Azure DevOps for
+    project management). They can be called from execute_script, which orchestrates these
+    remote tool calls using a Python-like syntax.
 
     Args:
         path: Dot-separated path (e.g., "math.statistics")
               Empty string or no argument lists root level
+              Supports wildcard pattern "module/*" to search all submodules recursively, instead of going into them one by one.
 
     Returns:
         String with submodules listed first, then functions with parameters and descriptions
     """
 
-    parts = [i for i in path.split(".") if i != ""]
+    # Check for wildcard pattern
+    is_wildcard = path.endswith("/*") or path == "*"
+    if is_wildcard:
+        # Strip the /* suffix or * for root
+        if path == "*":
+            base_path = ""
+        else:
+            base_path = path[:-2]
+        parts = [i for i in base_path.split(".") if i != ""]
+    else:
+        parts = [i for i in path.split(".") if i != ""]
+
     current_folder = root
 
     for part in parts:
@@ -356,6 +402,40 @@ def browse_tools(root: Folder, path: str = "") -> str:
         if not folder:
             return f"Path '{path}' not found."
         current_folder = folder
+
+    # If wildcard, collect all tools recursively
+    if is_wildcard:
+        # base_path was already computed above
+        all_tools = _collect_all_tools_recursive(current_folder, base_path)
+
+        if not all_tools:
+            display_path = "*" if path == "*" else f"{base_path}/*"
+            return f"No functions found under '{display_path}'"
+
+        result_parts = []
+        display_path = "*" if path == "*" else f"{base_path}/*"
+        result_parts.append(
+            f"Functions found under '{display_path}' ({len(all_tools)} total):"
+        )
+        result_parts.append("")
+
+        # Group tools by their path
+        from collections import defaultdict
+
+        tools_by_path = defaultdict(list)
+        for tool_path, tool in all_tools:
+            tools_by_path[tool_path].append(tool)
+
+        # Sort paths for consistent output
+        for tool_path in sorted(tools_by_path.keys()):
+            result_parts.append(f"# {tool_path}")
+            for tool in tools_by_path[tool_path]:
+                func_def = _format_function_description(tool)
+                indented = "\n".join(f"  {line}" for line in func_def.split("\n"))
+                result_parts.append(indented)
+            result_parts.append("")
+
+        return "\n".join(result_parts)
 
     # Build full paths for submodules with counts
     current_path = path if path else ""
@@ -438,15 +518,41 @@ def _execute_script_sync(tools: list[Tool], script: str) -> str:
 
 async def execute_script(tools: list[Tool], script: str) -> str:
     """
-    This is simple python interpreter that enables to use tools returned with `browse_tools` tool.
-    The script supports python subset as: imports, variables, literals (str/int/list/dict),
-    operators (+,-,*,/,==,<,>), if/else, while, def/return, print().
-    Everything that's printed will be returned as the result of this tool.
+    Execute a Python-like script that calls MCP tools from browse_tools.
+
+    IMPORTANT: Functions from browse_tools are NOT Python code - they are REMOTE CALLS
+    to MCP tools/servers. When you call a function, it sends a request through MCP protocol
+    to an external server (e.g., Playwright, Azure DevOps) and returns the result.
+
+    This is a SIMPLE SUBSET interpreter for orchestrating MCP tool calls:
+
+    SUPPORTED:
+    - Imports: `from module import func` or `import module as alias` (imports MCP tool references)
+    - Literals: integers (42), strings ('text' or "text"), lists ([1,2,3]), dicts ({"key": "value"})
+    - Variables: assignment (x = 5) and usage
+    - Operators: arithmetic (+,-,*,/), comparison (==,<,>)
+    - Control: if/else, while loops
+    - Functions: def/return for custom functions
+    - Builtin: print() to output results
+
+    NOT SUPPORTED (will fail):
+    - Standard Python libraries (no import requests, pandas, etc.)
+    - for loops, list comprehensions, string methods
+    - indexing/slicing (arr[0], str[1:3])
+    - attribute access except via imports (obj.method won't work)
+    - classes, exceptions, with statements, async/await
+    - complex operators (%, //, **, !=, >=, <=, and, or, not, in)
+
+    Output: Everything printed via print() is returned as the result.
 
     Example:
     ```python
-        import math.operations as op
-        print(op.plus(2, 3))
+        import math.operations as ops
+        result = ops.plus(2, 3)
+        print(result)  # Outputs: 5
+
+        # Multiple operations
+        print(ops.multiply(4, 5))  # Outputs: 20
     ```
     """
     # Run the script in a separate thread so that tools can use

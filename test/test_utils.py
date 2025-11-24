@@ -1383,3 +1383,187 @@ class TestNamespaceMappings:
         # Tool should keep full name
         assert len(browser_folder.tools) == 1
         assert browser_folder.tools[0].name == "mcp__playwright__browser_click"
+
+
+class TestBrowseToolsWildcard:
+    """Test suite for browse_tools wildcard search functionality."""
+
+    def test_wildcard_search_single_level(self):
+        """Test wildcard search on a single level namespace."""
+        tools = [
+            Tool(name="math_add", func=None, description="Add numbers", parameters=None),
+            Tool(name="math_subtract", func=None, description="Subtract numbers", parameters=None),
+            Tool(name="math_multiply", func=None, description="Multiply numbers", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["math_*"], namespace="math")
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+
+        # Wildcard search on test_server.math/*
+        result = browse_tools(root, "test_server.math/*")
+
+        # Should show summary
+        assert "Functions found under 'test_server.math/*'" in result
+        assert "(3 total)" in result
+
+        # Should show all functions
+        assert "# test_server.math" in result
+        assert "def add" in result
+        assert "def subtract" in result
+        assert "def multiply" in result
+
+    def test_wildcard_search_nested_levels(self):
+        """Test wildcard search that traverses nested submodules."""
+        tools = [
+            Tool(name="api_users_create", func=None, description="Create user", parameters=None),
+            Tool(name="api_users_delete", func=None, description="Delete user", parameters=None),
+            Tool(name="api_products_create", func=None, description="Create product", parameters=None),
+            Tool(name="api_products_list", func=None, description="List products", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["api_users_*"], namespace="api.users"),
+            NamespaceMapping(tools=["api_products_*"], namespace="api.products"),
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+
+        # Wildcard search on test_server.api/*
+        result = browse_tools(root, "test_server.api/*")
+
+        # Should show summary
+        assert "Functions found under 'test_server.api/*'" in result
+        assert "(4 total)" in result
+
+        # Should group by path
+        assert "# test_server.api.users" in result
+        assert "# test_server.api.products" in result
+
+        # Should show all functions
+        assert "def create" in result or "Create user" in result
+        assert "def delete" in result or "Delete user" in result
+        assert "def list" in result or "List products" in result
+
+    def test_wildcard_search_empty_results(self):
+        """Test wildcard search on namespace with no functions."""
+        tools = [
+            Tool(name="api_users_create", func=None, description="Create user", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["api_users_*"], namespace="api.users")
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+
+        # Wildcard search on empty namespace
+        result = browse_tools(root, "test_server.api.products/*")
+
+        # Should show not found message
+        assert "not found" in result.lower()
+
+    def test_wildcard_search_root_level(self):
+        """Test wildcard search at root level."""
+        tools = [
+            Tool(name="math_add", func=None, description="Add", parameters=None),
+            Tool(name="string_concat", func=None, description="Concat", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["math_*"], namespace="math"),
+            NamespaceMapping(tools=["string_*"], namespace="string"),
+        ]
+
+        config1 = MCPServerConfig(
+            name="server1",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=namespace_mappings,
+        )
+        config2 = MCPServerConfig(
+            name="server2",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=namespace_mappings,
+        )
+
+        tool_group1 = ToolGroup(server_config=config1, tools=[tools[0]])
+        tool_group2 = ToolGroup(server_config=config2, tools=[tools[1]])
+
+        root = Folder.from_tools([tool_group1, tool_group2])
+
+        # Wildcard search at root
+        result = browse_tools(root, "*")
+
+        # Should collect from all servers
+        assert "Functions found under '*'" in result
+
+    def test_wildcard_search_maintains_path_grouping(self):
+        """Test that wildcard search groups functions by their full paths."""
+        tools = [
+            Tool(name="browser_navigate", func=None, description="Navigate", parameters=None),
+            Tool(name="browser_click", func=None, description="Click", parameters=None),
+            Tool(name="browser_console_messages", func=None, description="Console", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["browser_navigate", "browser_click"], namespace="browser.actions"),
+            NamespaceMapping(tools=["browser_console_*"], namespace="browser.debug"),
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools, namespace_mappings)])
+
+        result = browse_tools(root, "test_server.browser/*")
+
+        # Should show both groups
+        assert "# test_server.browser.actions" in result
+        assert "# test_server.browser.debug" in result
+
+        # Actions group should have navigate and click
+        actions_idx = result.index("# test_server.browser.actions")
+        debug_idx = result.index("# test_server.browser.debug")
+        actions_section = result[actions_idx:debug_idx]
+
+        assert "navigate" in actions_section.lower()
+        assert "click" in actions_section.lower()
+
+    def test_wildcard_on_nonexistent_path(self):
+        """Test wildcard search on path that doesn't exist."""
+        tools = [
+            Tool(name="api_users_create", func=None, description="Create", parameters=None),
+        ]
+
+        root = Folder.from_tools([create_tool_group(tools)])
+
+        result = browse_tools(root, "nonexistent.path/*")
+
+        assert "not found" in result.lower()
+
+    def test_wildcard_with_remove_prefix(self):
+        """Test wildcard search with remove_prefix configuration."""
+        tools = [
+            Tool(name="mcp__pw__browser_click", func=None, description="Click", parameters=None),
+            Tool(name="mcp__pw__browser_navigate", func=None, description="Navigate", parameters=None),
+        ]
+
+        namespace_mappings = [
+            NamespaceMapping(tools=["mcp__pw__browser_*"], namespace="browser")
+        ]
+
+        config = MCPServerConfig(
+            name="playwright",
+            stdio=StdioConfig(command="test", args=[]),
+            namespace_mappings=namespace_mappings,
+            remove_prefix="mcp__pw__browser_",
+        )
+        tool_group = ToolGroup(server_config=config, tools=tools)
+        root = Folder.from_tools([tool_group])
+
+        result = browse_tools(root, "playwright/*")
+
+        # Should show tools with prefix removed
+        assert "def click" in result
+        assert "def navigate" in result
+        # Should NOT show original prefixed names
+        assert "mcp__pw__browser_click" not in result
