@@ -38,7 +38,7 @@ A simple lexer, parser, and interpreter for a Python-like subset language.
 
 ### Data Types
 - **Numbers**: Integer literals (e.g., `42`, `100`)
-- **Strings**: Double-quoted strings (e.g., `"hello"`)
+- **Strings**: Single or double-quoted strings (e.g., `"hello"`, `'world'`)
 - **Lists**: List literals with square brackets (e.g., `[1, 2, 3]`, `[10, 20, 30]`)
   - Empty lists: `[]`
   - Lists with expressions: `[1 + 2, 3 * 4]`

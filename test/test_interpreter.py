@@ -247,6 +247,75 @@ result"""
     assert result == "custom: test"
 
 
+class TestInterpreterStringSupport:
+    """Test interpreter evaluation of strings with single and double quotes"""
+
+    def test_interpreter_evaluates_single_quote_string(self):
+        """Test evaluating a single-quoted string"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("'hello'")
+        assert result == "hello"
+
+    def test_interpreter_evaluates_double_quote_string(self):
+        """Test evaluating a double-quoted string"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('"hello"')
+        assert result == "hello"
+
+    def test_interpreter_single_quote_assignment(self):
+        """Test assigning a single-quoted string to a variable"""
+        interpreter = Interpreter([])
+        script = """s = 'world'
+s"""
+        result = interpreter.evaluate(script)
+        assert result == "world"
+
+    def test_interpreter_empty_single_quote_string(self):
+        """Test evaluating an empty single-quoted string"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("''")
+        assert result == ""
+
+    def test_interpreter_empty_double_quote_string(self):
+        """Test evaluating an empty double-quoted string"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('""')
+        assert result == ""
+
+    def test_interpreter_single_quote_with_double_quote_inside(self):
+        """Test single-quoted string containing double quotes"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("""'He said "hello"'""")
+        assert result == 'He said "hello"'
+
+    def test_interpreter_double_quote_with_single_quote_inside(self):
+        """Test double-quoted string containing single quotes"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate('''"It's working"''')
+        assert result == "It's working"
+
+    def test_interpreter_mixed_quotes_in_list(self):
+        """Test list with mixed single and double-quoted strings"""
+        interpreter = Interpreter([])
+        result = interpreter.evaluate("""['single', "double", 'mixed']""")
+        assert result == ["single", "double", "mixed"]
+
+    def test_interpreter_single_quote_as_function_argument(self):
+        """Test passing single-quoted string to a function"""
+        def echo_func(text: str) -> str:
+            """Echo text."""
+            return f"echo: {text}"
+
+        echo_tool = Tool.from_function(echo_func)
+        echo_tool.name = "builtins_echo"
+
+        interpreter = Interpreter([echo_tool])
+        script = """result = echo('hello world')
+result"""
+        result = interpreter.evaluate(script)
+        assert result == "echo: hello world"
+
+
 class TestInterpreterListSupport:
     """Test interpreter evaluation of lists"""
 

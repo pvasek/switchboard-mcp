@@ -142,10 +142,10 @@ class Lexer:
             self.advance()
         return ident
 
-    def read_string(self):
+    def read_string(self, quote_char):
         self.advance()  # skip opening quote
         string = ""
-        while self.current_char() and self.current_char() != "\"":
+        while self.current_char() and self.current_char() != quote_char:
             string += self.current_char()
             self.advance()
         self.advance()  # skip closing quote
@@ -174,9 +174,11 @@ class Lexer:
                 token_type = self.keywords.get(ident, TokenType.IDENTIFIER)
                 tokens.append(Token(token_type, ident, self.line))
 
-            # Strings
+            # Strings (both single and double quotes)
             elif self.current_char() == "\"":
-                tokens.append(Token(TokenType.STRING, self.read_string(), self.line))
+                tokens.append(Token(TokenType.STRING, self.read_string("\""), self.line))
+            elif self.current_char() == "'":
+                tokens.append(Token(TokenType.STRING, self.read_string("'"), self.line))
 
             # Operators and punctuation
             elif self.current_char() == "+":
