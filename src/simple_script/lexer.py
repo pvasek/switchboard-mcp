@@ -76,6 +76,13 @@ class Lexer:
             return ""
         return self.source[self.pos]
 
+    def peek(self, offset=1):
+        """Peek ahead at a character without advancing position"""
+        pos = self.pos + offset
+        if pos >= len(self.source):
+            return ""
+        return self.source[pos]
+
     def advance(self):
         if self.current_char() == "\n":
             self.line += 1
@@ -151,6 +158,30 @@ class Lexer:
         self.advance()  # skip closing quote
         return string
 
+    def read_multiline_string(self, quote_char):
+        """Read a multiline string delimited by triple quotes (''' or \"\"\")"""
+        # Skip opening triple quotes
+        self.advance()  # skip first quote
+        self.advance()  # skip second quote
+        self.advance()  # skip third quote
+
+        string = ""
+        while self.current_char():
+            # Check for closing triple quotes
+            if (self.current_char() == quote_char and
+                self.peek(1) == quote_char and
+                self.peek(2) == quote_char):
+                # Skip closing triple quotes
+                self.advance()
+                self.advance()
+                self.advance()
+                return string
+
+            string += self.current_char()
+            self.advance()
+
+        raise SyntaxError(f"Unterminated multiline string starting at line {self.line}")
+
     def tokenize(self):
         tokens = []
 
@@ -174,11 +205,17 @@ class Lexer:
                 token_type = self.keywords.get(ident, TokenType.IDENTIFIER)
                 tokens.append(Token(token_type, ident, self.line))
 
-            # Strings (both single and double quotes)
+            # Strings (check for triple quotes first, then single quotes)
             elif self.current_char() == "\"":
-                tokens.append(Token(TokenType.STRING, self.read_string("\""), self.line))
+                if self.peek(1) == "\"" and self.peek(2) == "\"":
+                    tokens.append(Token(TokenType.STRING, self.read_multiline_string("\""), self.line))
+                else:
+                    tokens.append(Token(TokenType.STRING, self.read_string("\""), self.line))
             elif self.current_char() == "'":
-                tokens.append(Token(TokenType.STRING, self.read_string("'"), self.line))
+                if self.peek(1) == "'" and self.peek(2) == "'":
+                    tokens.append(Token(TokenType.STRING, self.read_multiline_string("'"), self.line))
+                else:
+                    tokens.append(Token(TokenType.STRING, self.read_string("'"), self.line))
 
             # Operators and punctuation
             elif self.current_char() == "+":

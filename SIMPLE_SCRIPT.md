@@ -39,6 +39,14 @@ A simple lexer, parser, and interpreter for a Python-like subset language.
 ### Data Types
 - **Numbers**: Integer literals (e.g., `42`, `100`)
 - **Strings**: Single or double-quoted strings (e.g., `"hello"`, `'world'`)
+  - Single-line strings: Use `"` or `'` for strings on one line
+  - Multiline strings: Use `"""` or `'''` for strings spanning multiple lines
+    ```python
+    short = "single line"
+    description = """This is a
+    multiline string that
+    spans multiple lines"""
+    ```
 - **Lists**: List literals with square brackets (e.g., `[1, 2, 3]`, `[10, 20, 30]`)
   - Empty lists: `[]`
   - Lists with expressions: `[1 + 2, 3 * 4]`
@@ -85,6 +93,48 @@ A simple lexer, parser, and interpreter for a Python-like subset language.
   ```python
   result = add(5, 3)
   print(result)
+  ```
+
+### Strings
+
+Strings are sequences of characters used for text data.
+
+- **Single-line strings**: Use single (`'`) or double (`"`) quotes
+  ```python
+  name = "Alice"
+  greeting = 'Hello, World!'
+  message = "It's a nice day"
+  ```
+
+- **Multiline strings**: Use triple quotes (`'''` or `"""`) for strings spanning multiple lines
+  ```python
+  poem = """Roses are red,
+  Violets are blue,
+  Python is great,
+  And so are you!"""
+
+  sql_query = '''SELECT *
+  FROM users
+  WHERE active = 1
+  ORDER BY name'''
+  ```
+
+- **Preserves formatting**: Multiline strings preserve line breaks and indentation
+  ```python
+  formatted = """Line 1
+      Line 2 (indented)
+  Line 3"""
+  # The string includes all whitespace and newlines as written
+  ```
+
+- **Strings as function arguments**: Pass strings to imported functions
+  ```python
+  from text.utils import uppercase, reverse
+
+  result = uppercase("hello")  # Single-line string
+  formatted = reverse("""multi
+  line
+  text""")  # Multiline string
   ```
 
 ### Lists

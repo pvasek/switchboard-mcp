@@ -424,6 +424,152 @@ class TestLexerDictSupport:
         assert len(tokens) == len(expected_types)
 
 
+class TestLexerMultilineStringSupport:
+    """Test lexer tokenization of multiline strings"""
+
+    def test_tokenize_double_quote_multiline_string(self):
+        """Test tokenizing triple double-quoted multiline string"""
+        source = '''"""This is a
+multiline string
+with multiple lines"""'''
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        assert len(tokens) == 2  # STRING, EOF
+        assert tokens[0].type == TokenType.STRING
+        assert tokens[0].value == """This is a
+multiline string
+with multiple lines"""
+        assert tokens[1].type == TokenType.EOF
+
+    def test_tokenize_single_quote_multiline_string(self):
+        """Test tokenizing triple single-quoted multiline string"""
+        source = """'''This is also
+a multiline string
+using single quotes'''"""
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        assert len(tokens) == 2  # STRING, EOF
+        assert tokens[0].type == TokenType.STRING
+        assert tokens[0].value == """This is also
+a multiline string
+using single quotes"""
+        assert tokens[1].type == TokenType.EOF
+
+    def test_tokenize_multiline_string_with_indentation(self):
+        """Test that multiline strings preserve indentation"""
+        source = '''"""Line 1
+    Line 2 indented
+Line 3"""'''
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        assert len(tokens) == 2
+        assert tokens[0].type == TokenType.STRING
+        assert tokens[0].value == """Line 1
+    Line 2 indented
+Line 3"""
+
+    def test_tokenize_multiline_string_assignment(self):
+        """Test tokenizing assignment with multiline string"""
+        source = '''text = """First line
+Second line
+Third line"""'''
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        expected_types = [
+            TokenType.IDENTIFIER,
+            TokenType.EQUAL,
+            TokenType.STRING,
+            TokenType.EOF,
+        ]
+
+        assert len(tokens) == len(expected_types)
+        for i, expected_type in enumerate(expected_types):
+            assert tokens[i].type == expected_type, f"Token {i} mismatch"
+
+        assert tokens[0].value == "text"
+        assert tokens[2].value == """First line
+Second line
+Third line"""
+
+    def test_tokenize_multiline_string_as_function_argument(self):
+        """Test tokenizing function call with multiline string argument"""
+        source = '''print("""Hello
+World""")'''
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        expected_types = [
+            TokenType.IDENTIFIER,
+            TokenType.LPAREN,
+            TokenType.STRING,
+            TokenType.RPAREN,
+            TokenType.EOF,
+        ]
+
+        assert len(tokens) == len(expected_types)
+        assert tokens[0].value == "print"
+        assert tokens[2].value == """Hello
+World"""
+
+    def test_tokenize_empty_multiline_string(self):
+        """Test tokenizing empty multiline string"""
+        lexer = Lexer('""""""')
+        tokens = lexer.tokenize()
+
+        assert len(tokens) == 2
+        assert tokens[0].type == TokenType.STRING
+        assert tokens[0].value == ""
+        assert tokens[1].type == TokenType.EOF
+
+    def test_tokenize_multiline_string_with_quotes_inside(self):
+        """Test multiline string containing single quotes"""
+        source = '''"""It's a "nice" day"""'''
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        assert len(tokens) == 2
+        assert tokens[0].type == TokenType.STRING
+        assert tokens[0].value == '''It's a "nice" day'''
+
+    def test_tokenize_multiple_multiline_strings(self):
+        """Test tokenizing multiple multiline strings in sequence"""
+        source = """first = \"\"\"Line 1
+Line 2\"\"\"
+second = '''Line 3
+Line 4'''"""
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+
+        # first, =, STRING, NEWLINE, second, =, STRING, EOF
+        assert tokens[0].value == "first"
+        assert tokens[1].type == TokenType.EQUAL
+        assert tokens[2].type == TokenType.STRING
+        assert tokens[2].value == """Line 1
+Line 2"""
+        assert tokens[3].type == TokenType.NEWLINE
+        assert tokens[4].value == "second"
+        assert tokens[5].type == TokenType.EQUAL
+        assert tokens[6].type == TokenType.STRING
+        assert tokens[6].value == """Line 3
+Line 4"""
+
+    def test_distinguish_single_vs_triple_quotes(self):
+        """Test that single quotes don't interfere with triple quotes"""
+        # Single quotes should work normally
+        lexer1 = Lexer('"hello"')
+        tokens1 = lexer1.tokenize()
+        assert tokens1[0].value == "hello"
+
+        # Triple quotes should also work
+        lexer2 = Lexer('"""hello"""')
+        tokens2 = lexer2.tokenize()
+        assert tokens2[0].value == "hello"
+
+
 class TestLexerImportAliasSupport:
     """Test lexer tokenization of import alias statements"""
 
