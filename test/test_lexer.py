@@ -422,3 +422,85 @@ class TestLexerDictSupport:
         ]
 
         assert len(tokens) == len(expected_types)
+
+
+class TestLexerImportAliasSupport:
+    """Test lexer tokenization of import alias statements"""
+
+    def test_tokenize_import_as_keyword(self):
+        """Test tokenizing 'as' keyword"""
+        lexer = Lexer("as")
+        tokens = lexer.tokenize()
+
+        assert len(tokens) == 2  # AS, EOF
+        assert tokens[0].type == TokenType.AS
+        assert tokens[1].type == TokenType.EOF
+
+    def test_tokenize_simple_import_alias(self):
+        """Test tokenizing 'import module as m'"""
+        lexer = Lexer("import module as m")
+        tokens = lexer.tokenize()
+
+        expected_types = [
+            TokenType.IMPORT,
+            TokenType.IDENTIFIER,
+            TokenType.AS,
+            TokenType.IDENTIFIER,
+            TokenType.EOF,
+        ]
+
+        assert len(tokens) == len(expected_types)
+        for i, expected_type in enumerate(expected_types):
+            assert tokens[i].type == expected_type, f"Token {i} mismatch"
+
+        assert tokens[1].value == "module"
+        assert tokens[3].value == "m"
+
+    def test_tokenize_dotted_import_alias(self):
+        """Test tokenizing 'import math.operations as ops'"""
+        lexer = Lexer("import math.operations as ops")
+        tokens = lexer.tokenize()
+
+        expected_types = [
+            TokenType.IMPORT,
+            TokenType.IDENTIFIER,
+            TokenType.DOT,
+            TokenType.IDENTIFIER,
+            TokenType.AS,
+            TokenType.IDENTIFIER,
+            TokenType.EOF,
+        ]
+
+        assert len(tokens) == len(expected_types)
+        for i, expected_type in enumerate(expected_types):
+            assert tokens[i].type == expected_type, f"Token {i} mismatch"
+
+        assert tokens[1].value == "math"
+        assert tokens[3].value == "operations"
+        assert tokens[5].value == "ops"
+
+    def test_tokenize_deeply_nested_import_alias(self):
+        """Test tokenizing 'import module.sub.subsub as alias'"""
+        lexer = Lexer("import module.sub.subsub as alias")
+        tokens = lexer.tokenize()
+
+        expected_types = [
+            TokenType.IMPORT,
+            TokenType.IDENTIFIER,  # module
+            TokenType.DOT,
+            TokenType.IDENTIFIER,  # sub
+            TokenType.DOT,
+            TokenType.IDENTIFIER,  # subsub
+            TokenType.AS,
+            TokenType.IDENTIFIER,  # alias
+            TokenType.EOF,
+        ]
+
+        assert len(tokens) == len(expected_types)
+        for i, expected_type in enumerate(expected_types):
+            assert tokens[i].type == expected_type, f"Token {i} mismatch"
+
+        assert tokens[1].value == "module"
+        assert tokens[3].value == "sub"
+        assert tokens[5].value == "subsub"
+        assert tokens[7].value == "alias"

@@ -446,3 +446,136 @@ print_result(fact)"""
         # Check second import
         assert ast[1].module_path == "io.display"
         assert ast[1].names == ["print_result"]
+
+    def test_import_module_alias_simple(self):
+        """Test simple module alias import: import math as m"""
+        source = """import math as m"""
+
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        assert len(ast) == 1
+        assert isinstance(ast[0], ImportStatement)
+        assert ast[0].module_path == "math"
+        assert ast[0].alias == "m"
+        assert ast[0].names is None
+
+    def test_import_module_alias_dotted(self):
+        """Test dotted module alias import: import math.operations as ops"""
+        source = """import math.operations as ops"""
+
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        assert len(ast) == 1
+        assert isinstance(ast[0], ImportStatement)
+        assert ast[0].module_path == "math.operations"
+        assert ast[0].alias == "ops"
+        assert ast[0].names is None
+
+    def test_import_module_alias_deeply_nested(self):
+        """Test deeply nested module alias: import module.sub.subsub as alias"""
+        source = """import module.sub.subsub as alias"""
+
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        assert len(ast) == 1
+        assert isinstance(ast[0], ImportStatement)
+        assert ast[0].module_path == "module.sub.subsub"
+        assert ast[0].alias == "alias"
+        assert ast[0].names is None
+
+    def test_mixed_import_styles(self):
+        """Test mixing selective imports and module aliases"""
+        source = """from math.statistics import min, max
+import math.operations as ops
+from io import print_result
+import math.random as rand"""
+
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        assert len(ast) == 4
+
+        # First: selective import
+        assert isinstance(ast[0], ImportStatement)
+        assert ast[0].module_path == "math.statistics"
+        assert ast[0].names == ["min", "max"]
+        assert ast[0].alias is None
+
+        # Second: module alias
+        assert isinstance(ast[1], ImportStatement)
+        assert ast[1].module_path == "math.operations"
+        assert ast[1].alias == "ops"
+        assert ast[1].names is None
+
+        # Third: selective import
+        assert isinstance(ast[2], ImportStatement)
+        assert ast[2].module_path == "io"
+        assert ast[2].names == ["print_result"]
+        assert ast[2].alias is None
+
+        # Fourth: module alias
+        assert isinstance(ast[3], ImportStatement)
+        assert ast[3].module_path == "math.random"
+        assert ast[3].alias == "rand"
+        assert ast[3].names is None
+
+    def test_dotted_function_call_parsing(self):
+        """Test parsing dotted function calls like ops.plus(1, 2)"""
+        source = """result = ops.plus(1, 2)"""
+
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        assert len(ast) == 1
+        assert isinstance(ast[0], Assignment)
+        assert ast[0].name == "result"
+
+        # Check the call expression
+        call_expr = ast[0].value
+        assert isinstance(call_expr, Call)
+        assert call_expr.function == "ops.plus"
+        assert len(call_expr.arguments) == 2
+        assert isinstance(call_expr.arguments[0], Number)
+        assert call_expr.arguments[0].value == 1
+        assert isinstance(call_expr.arguments[1], Number)
+        assert call_expr.arguments[1].value == 2
+
+    def test_multiple_dotted_function_calls(self):
+        """Test multiple dotted function calls in a program"""
+        source = """import math.operations as ops
+x = ops.plus(5, 3)
+y = ops.multiply(x, 2)
+z = ops.minus(y, 1)"""
+
+        lexer = Lexer(source)
+        tokens = lexer.tokenize()
+        parser = Parser(tokens)
+        ast = parser.parse()
+
+        assert len(ast) == 4
+        assert isinstance(ast[0], ImportStatement)
+        assert ast[0].module_path == "math.operations"
+        assert ast[0].alias == "ops"
+
+        # Check each assignment
+        for i in range(1, 4):
+            assert isinstance(ast[i], Assignment)
+            assert isinstance(ast[i].value, Call)
+            assert ast[i].value.function.startswith("ops.")
+
+        assert ast[1].value.function == "ops.plus"
+        assert ast[2].value.function == "ops.multiply"
+        assert ast[3].value.function == "ops.minus"

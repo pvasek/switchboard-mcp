@@ -17,6 +17,7 @@ class TokenType(Enum):
     RETURN = auto()
     FROM = auto()
     IMPORT = auto()
+    AS = auto()
 
     # Operators
     PLUS = auto()
@@ -67,6 +68,7 @@ class Lexer:
             "return": TokenType.RETURN,
             "from": TokenType.FROM,
             "import": TokenType.IMPORT,
+            "as": TokenType.AS,
         }
 
     def current_char(self):

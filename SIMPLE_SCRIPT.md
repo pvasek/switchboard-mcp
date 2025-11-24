@@ -11,6 +11,16 @@ A simple lexer, parser, and interpreter for a Python-like subset language.
   from mymodule.submodule import func1, func2
   ```
 
+- **Module aliases**: Import modules with aliases for easier access
+  ```python
+  import module as m
+  import module.submodule as s
+
+  # Use the alias to call functions
+  result = m.function_name(arg1, arg2)
+  value = s.another_function(arg)
+  ```
+
 ### Builtin Functions
 - **Automatic availability**: Builtin functions are available without importing
 - **Tool integration**: Builtins are tools with names starting with `builtins_`
@@ -238,10 +248,14 @@ Dictionaries are key-value mappings that allow efficient data organization.
 ## Example Program
 
 ```python
-# Import functions from other modules
+# Import functions from other modules (selective imports)
 from math.utils import factorial
 from math.statistics import min, max, average
 from io.display import print_result
+
+# Import modules with aliases
+import math.operations as ops
+import math.random as rand
 
 # Calculate factorial
 def calculate():
@@ -284,6 +298,11 @@ a = 10
 b = 20
 calculated = [a + b, a * 2, b / 2]
 
+# Using module aliases
+sum_result = ops.plus(a, b)          # Using aliased module
+product = ops.multiply(a, b)         # math.operations.multiply via 'ops' alias
+random_nums = rand.generate_list(5, 1, 100)  # math.random.generate_list via 'rand' alias
+
 # Dictionary examples
 person = {"name": "David", "age": 28, "role": "developer"}
 print("Person record created")
@@ -320,6 +339,9 @@ data = {
 - Converts tokens into Abstract Syntax Tree (AST)
 - Supports expression precedence: comparison → addition → multiplication → primary
 - Parses statements: assignments, function definitions, control flow, returns
+- Handles two import styles:
+  - Selective imports: `from module.submodule import func1, func2`
+  - Module aliases: `import module.submodule as alias`
 
 ### AST Node Types
 - **Expressions**: Number, String, Variable, BinaryOp, Call, ListLiteral
@@ -331,6 +353,9 @@ data = {
 - Supports tool integration:
   - **Regular tools**: Imported tools map to external tool functions
     - Example: `from math.statistics import min` maps to tool named `math_statistics_min`
+  - **Module aliases**: Aliased modules allow accessing tools via dot notation
+    - Example: `import math.operations as ops` then `ops.plus(1, 2)` maps to tool `math_operations_plus`
+    - Alias is stored in environment and resolved at call time
   - **Builtin tools**: Tools prefixed with `builtins_` are automatically available
     - Example: Tool named `builtins_print` is available as `print()` without import
     - Imported functions take precedence over builtins with the same name

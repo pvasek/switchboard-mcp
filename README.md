@@ -32,23 +32,36 @@ Enable basic tool composition without full code execution. Instead of:
 
 Run a simple script:
 ```python
+# Using selective imports
 from api import fetch_data, transform
 from graph import plot
 data = fetch_data("endpoint")
 result = transform(data)
 plot(result)
+
+# Or using module aliases
+import api.data as data_api
+import graph.visualize as viz
+dataset = data_api.fetch("endpoint")
+viz.plot(dataset)
 ```
 
 The data stays server-side, only final output returns to the host. Uses a minimal Python-like DSL ([simple script](SIMPLE_SCRIPT.md)) - not full Python execution.
 
 ## Simple Script
 
-A Python-subset interpreter for tool composition. Supports imports, variables, literals (str/int/list/dict), operators, if/else, while, functions. See [SIMPLE_SCRIPT.md](SIMPLE_SCRIPT.md) for details.
+A Python-subset interpreter for tool composition. Supports two import styles (selective and aliased), variables, literals (str/int/list/dict), operators, if/else, while, functions. See [SIMPLE_SCRIPT.md](SIMPLE_SCRIPT.md) for details.
 
 ```python
+# Selective imports
 from playwright.navigation import navigate
 from playwright.inspection import snapshot
+
+# Module aliases
+import playwright.interaction as interact
+
 navigate("https://example.com")
+interact.click("button[type='submit']")
 page = snapshot()
 print(page)
 ```

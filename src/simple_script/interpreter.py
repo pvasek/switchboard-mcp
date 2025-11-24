@@ -87,18 +87,35 @@ class Interpreter:
             raise RuntimeError(f"Unknown statement type: {type(node)}")
 
     def _execute_import(self, node: ImportStatement) -> None:
-        """Execute an import statement"""
-        module_path = node.module_path
-        for name in node.names:
-            # Build the full path: "math.statistics.min"
-            full_path = f"{module_path}.{name}"
+        """Execute an import statement.
 
-            # Check if this corresponds to a tool
-            if full_path in self.tool_map:
-                # Store the tool in the environment under the imported name
-                self.env[name] = self.tool_map[full_path]
-            else:
-                raise RuntimeError(f"Tool '{full_path}' not found")
+        Two styles supported:
+        1. Selective import: from module.path import name1, name2
+        2. Module alias: import module.path as alias
+        """
+        module_path = node.module_path
+
+        if node.names is not None:
+            # Selective import: from module import name1, name2
+            for name in node.names:
+                # Build the full path: "math.statistics.min"
+                full_path = f"{module_path}.{name}"
+
+                # Check if this corresponds to a tool
+                if full_path in self.tool_map:
+                    # Store the tool in the environment under the imported name
+                    self.env[name] = self.tool_map[full_path]
+                else:
+                    raise RuntimeError(f"Tool '{full_path}' not found")
+
+        elif node.alias is not None:
+            # Module alias: import module.path as alias
+            # Store the module path under the alias name
+            # We'll use a special marker to distinguish module aliases from variables
+            self.env[node.alias] = ("__module_alias__", module_path)
+
+        else:
+            raise RuntimeError("ImportStatement must have either 'names' or 'alias'")
 
         return None
 
@@ -188,9 +205,41 @@ class Interpreter:
             raise RuntimeError(f"Unknown operator: {node.operator}")
 
     def _evaluate_call(self, node: Call) -> Any:
-        """Evaluate a function call"""
+        """Evaluate a function call.
+
+        Supports both:
+        - Direct calls: func(args)
+        - Module alias calls: alias.func(args)
+        """
         # Evaluate arguments
         args = [self._evaluate_expression(arg) for arg in node.arguments]
+
+        # Check if it's a dotted function name (e.g., ops.plus)
+        if "." in node.function:
+            parts = node.function.split(".", 1)  # Split on first dot only
+            alias = parts[0]
+            func_name = parts[1]
+
+            # Look up the alias
+            if alias not in self.env:
+                raise RuntimeError(f"Module alias '{alias}' not defined")
+
+            obj = self.env[alias]
+
+            # Check if it's a module alias
+            if isinstance(obj, tuple) and len(obj) == 2 and obj[0] == "__module_alias__":
+                module_path = obj[1]
+                # Build the full tool path: "module.path.func"
+                full_path = f"{module_path}.{func_name}"
+
+                # Look up the tool
+                if full_path in self.tool_map:
+                    tool = self.tool_map[full_path]
+                    return tool.func(*args)
+                else:
+                    raise RuntimeError(f"Tool '{full_path}' not found in module '{module_path}'")
+            else:
+                raise RuntimeError(f"'{alias}' is not a module alias")
 
         # Check if it's a user-defined function
         if node.function in self.functions:

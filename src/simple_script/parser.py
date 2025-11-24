@@ -51,7 +51,8 @@ class DictLiteral(ASTNode):
 @dataclass
 class ImportStatement(ASTNode):
     module_path: str
-    names: list[str]
+    names: list[str] | None = None  # For selective imports: from X import a, b
+    alias: str | None = None  # For module aliases: import X as Y
 
 
 @dataclass
@@ -127,8 +128,8 @@ class Parser:
     def parse_statement(self):
         self.skip_newlines()
 
-        # Import statement
-        if self.current_token().type == TokenType.FROM:
+        # Import statement (both styles)
+        if self.current_token().type in (TokenType.FROM, TokenType.IMPORT):
             return self.parse_import_statement()
 
         # Function definition
@@ -173,28 +174,61 @@ class Parser:
         return ExpressionStatement(expr)
 
     def parse_import_statement(self):
-        # from module.path import name1, name2
-        self.expect(TokenType.FROM)
+        """Parse import statements.
 
-        # Parse module path (e.g., mymodule.submodule)
-        module_parts = []
-        module_parts.append(self.expect(TokenType.IDENTIFIER).value)
-        while self.current_token().type == TokenType.DOT:
-            self.advance()  # skip dot
+        Two styles supported:
+        1. from module.path import name1, name2
+        2. import module.path as alias
+        """
+        current = self.current_token()
+
+        if current.type == TokenType.FROM:
+            # Selective import: from module import name1, name2
+            self.expect(TokenType.FROM)
+
+            # Parse module path (e.g., mymodule.submodule)
+            module_parts = []
             module_parts.append(self.expect(TokenType.IDENTIFIER).value)
-        module_path = ".".join(module_parts)
+            while self.current_token().type == TokenType.DOT:
+                self.advance()  # skip dot
+                module_parts.append(self.expect(TokenType.IDENTIFIER).value)
+            module_path = ".".join(module_parts)
 
-        self.expect(TokenType.IMPORT)
+            self.expect(TokenType.IMPORT)
 
-        # Parse import names
-        names = []
-        names.append(self.expect(TokenType.IDENTIFIER).value)
-        while self.current_token().type == TokenType.COMMA:
-            self.advance()  # skip comma
+            # Parse import names
+            names = []
             names.append(self.expect(TokenType.IDENTIFIER).value)
+            while self.current_token().type == TokenType.COMMA:
+                self.advance()  # skip comma
+                names.append(self.expect(TokenType.IDENTIFIER).value)
 
-        self.skip_newlines()
-        return ImportStatement(module_path, names)
+            self.skip_newlines()
+            return ImportStatement(module_path, names=names)
+
+        elif current.type == TokenType.IMPORT:
+            # Module alias import: import module.path as alias
+            self.expect(TokenType.IMPORT)
+
+            # Parse module path (e.g., mymodule.submodule)
+            module_parts = []
+            module_parts.append(self.expect(TokenType.IDENTIFIER).value)
+            while self.current_token().type == TokenType.DOT:
+                self.advance()  # skip dot
+                module_parts.append(self.expect(TokenType.IDENTIFIER).value)
+            module_path = ".".join(module_parts)
+
+            # Expect 'as' keyword
+            self.expect(TokenType.AS)
+
+            # Parse alias name
+            alias = self.expect(TokenType.IDENTIFIER).value
+
+            self.skip_newlines()
+            return ImportStatement(module_path, alias=alias)
+
+        else:
+            raise SyntaxError(f"Expected 'from' or 'import', got {current.type}")
 
     def parse_function_def(self):
         self.expect(TokenType.DEF)
@@ -324,10 +358,15 @@ class Parser:
             self.advance()
             return String(value)
 
-        # Variable or function call
+        # Variable or function call (possibly dotted, e.g., alias.func)
         if self.current_token().type == TokenType.IDENTIFIER:
             name = self.current_token().value
             self.advance()
+
+            # Handle dotted names (e.g., ops.plus)
+            while self.current_token().type == TokenType.DOT:
+                self.advance()  # skip dot
+                name += "." + self.expect(TokenType.IDENTIFIER).value
 
             # Function call
             if self.current_token().type == TokenType.LPAREN:
