@@ -114,6 +114,47 @@ playwright.interaction.click()        # browser_click → click
 playwright.interaction.hover()        # browser_hover → hover
 ```
 
+## Using Switchboard MCP
+
+To use Switchboard MCP in other MCP clients (like Claude Desktop, Cline, etc.), add it to your MCP client configuration file:
+
+### MCP Client Configuration
+
+Add to `mcp_client.json` or your client's configuration file:
+
+```json
+{
+  "mcpServers": {
+    "switchboard": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "<path-to-switchboard-mcp>",
+        "run",
+        "python",
+        "-m",
+        "switchboard_mcp.server"
+      ],
+      "env": {}
+    }
+  }
+}
+```
+
+Replace `<path-to-switchboard-mcp>` with the actual path to your switchboard-mcp directory.
+
+### Available Tools
+
+Once connected, you'll have access to two main tools:
+
+1. **`browse_tools(path: str)`** - Browse the hierarchical tool structure
+   - Example: `browse_tools("")` - List all top-level modules
+   - Example: `browse_tools("playwright.navigation")` - See tools in navigation module
+
+2. **`execute_script(script: str)`** - Execute simple Python-like scripts to compose tools
+   - Supports imports, variables, control flow, functions
+   - See [SIMPLE_SCRIPT.md](SIMPLE_SCRIPT.md) for full language reference
+
 ## Development
 
 ### Project Structure

@@ -44,7 +44,7 @@ class Folder:
                 tool_to_add = tool
                 if remove_prefix and tool.name.startswith(remove_prefix):
                     # Create a new tool with the prefix removed from the name
-                    new_name = tool.name[len(remove_prefix):]
+                    new_name = tool.name[len(remove_prefix) :]
                     tool_to_add = Tool(
                         name=new_name,
                         func=tool.func,
@@ -438,17 +438,20 @@ def _execute_script_sync(tools: list[Tool], script: str) -> str:
 
 async def execute_script(tools: list[Tool], script: str) -> str:
     """
-    Python-like interpreter. Supports: imports, variables, literals (str/int/list/dict),
+    This is simple python interpreter that enables to use tools returned with `browse_tools` tool.
+    The script supports python subset as: imports, variables, literals (str/int/list/dict),
     operators (+,-,*,/,==,<,>), if/else, while, def/return, print().
+    Everything that's printed will be returned as the result of this tool.
 
     Example:
     ```python
-        from math.operations import plus
-        print(plus(2, 3))
+        import math.operations as op
+        print(op.plus(2, 3))
     ```
     """
     # Run the script in a separate thread so that tools can use
     # asyncio.run_coroutine_threadsafe to call back to this event loop
+    print("------------ execute_script: ", script)
     loop = asyncio.get_running_loop()
     with ThreadPoolExecutor() as executor:
         result = await loop.run_in_executor(
